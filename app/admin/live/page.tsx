@@ -1,0 +1,413 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ChevronLeft, Trash2, Plus } from 'lucide-react';
+import Link from 'next/link';
+import type { MatchStatusShort } from '@/types/match';
+import {
+  subscribeMatchState, subscribeMatchEvents,
+  updateMatchState, addGoalEvent, addCardEvent, deleteMatchEvent,
+  initMatchState,
+} from '@/lib/firebase/matchState';
+import type { MatchStateDoc, MatchEventDoc } from '@/lib/firebase/matchState';
+
+// ── 상수 ─────────────────────────────────────────────────────────────────────
+
+const STATUS_FLOW: { status: MatchStatusShort; label: string; color: string }[] = [
+  { status: 'NS',  label: '경기 전',   color: 'bg-slate-500' },
+  { status: '1H',  label: '전반 시작', color: 'bg-blue-500' },
+  { status: 'HT',  label: '하프타임', color: 'bg-yellow-500' },
+  { status: '2H',  label: '후반 시작', color: 'bg-orange-500' },
+  { status: 'FT',  label: '경기 종료', color: 'bg-red-600' },
+];
+
+const KOREA_PLAYERS = ['손흥민','이강인','김민재','황희찬','이재성','조규성','오현규','박용우','정우영','설영우','김태환','김문환','이기혁','이동경','직접 입력'];
+const MEXICO_PLAYERS = ['S.히메네스','H.로사노','A.비달','G.도스 산토스','A.마르틴','J.산체스','E.알바레스','G.아르타가','R.히메네스','직접 입력'];
+
+// ── GoalForm ──────────────────────────────────────────────────────────────────
+
+function GoalForm() {
+  const [team, setTeam] = useState<'KOREA' | 'MEXICO'>('KOREA');
+  const [minute, setMinute] = useState('');
+  const [scorer, setScorer] = useState('');
+  const [customScorer, setCustomScorer] = useState('');
+  const [assist, setAssist] = useState('');
+  const [type, setType] = useState<'normal' | 'penalty' | 'own_goal'>('normal');
+  const [loading, setLoading] = useState(false);
+
+  const players = team === 'KOREA' ? KOREA_PLAYERS : MEXICO_PLAYERS;
+  const finalScorer = scorer === '직접 입력' ? customScorer : scorer;
+
+  async function handleAdd() {
+    if (!minute || !finalScorer) return;
+    setLoading(true);
+    await addGoalEvent({
+      time: Number(minute),
+      extraTime: null,
+      side: team === 'KOREA' ? 'away' : 'home',
+      teamName: team === 'KOREA' ? 'Korea Republic' : 'Mexico',
+      scorer: finalScorer,
+      assist: assist || null,
+      type,
+    });
+    setMinute(''); setScorer(''); setCustomScorer(''); setAssist('');
+    setLoading(false);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <button type="button" onClick={() => { setTeam('KOREA'); setScorer(''); }}
+          className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${team === 'KOREA' ? 'border-korea-red bg-red-50 text-korea-red' : 'border-border'}`}>
+          🇰🇷 대한민국
+        </button>
+        <button type="button" onClick={() => { setTeam('MEXICO'); setScorer(''); }}
+          className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${team === 'MEXICO' ? 'border-green-600 bg-green-50 text-green-700' : 'border-border'}`}>
+          🇲🇽 멕시코
+        </button>
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-xs text-muted-foreground mb-1">득점 시간 (분)</label>
+          <input type="number" min="1" max="120" value={minute}
+            onChange={(e) => setMinute(e.target.value)} placeholder="예: 23"
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30" />
+        </div>
+        <div className="flex-1">
+          <label className="block text-xs text-muted-foreground mb-1">유형</label>
+          <select value={type} onChange={(e) => setType(e.target.value as typeof type)}
+            className="w-full rounded-lg border px-3 py-2 text-sm">
+            <option value="normal">일반골</option>
+            <option value="penalty">페널티</option>
+            <option value="own_goal">자책골</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">득점자</label>
+        <select value={scorer} onChange={(e) => setScorer(e.target.value)}
+          className="w-full rounded-lg border px-3 py-2 text-sm">
+          <option value="">선택하세요</option>
+          {players.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        {scorer === '직접 입력' && (
+          <input type="text" value={customScorer} onChange={(e) => setCustomScorer(e.target.value)}
+            placeholder="선수 이름 직접 입력"
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30" />
+        )}
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">어시스트 (선택)</label>
+        <input type="text" value={assist} onChange={(e) => setAssist(e.target.value)}
+          placeholder="없으면 비워두세요"
+          className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30" />
+      </div>
+
+      <Button onClick={handleAdd} disabled={!minute || !finalScorer || loading}
+        variant="korea" className="w-full">
+        <Plus className="h-4 w-4 mr-1" />득점 추가
+      </Button>
+    </div>
+  );
+}
+
+// ── CardForm ──────────────────────────────────────────────────────────────────
+
+function CardForm() {
+  const [team, setTeam] = useState<'KOREA' | 'MEXICO'>('KOREA');
+  const [minute, setMinute] = useState('');
+  const [player, setPlayer] = useState('');
+  const [customPlayer, setCustomPlayer] = useState('');
+  const [cardType, setCardType] = useState<'yellow' | 'red' | 'yellow_red'>('yellow');
+  const [loading, setLoading] = useState(false);
+
+  const players = team === 'KOREA' ? KOREA_PLAYERS : MEXICO_PLAYERS;
+  const finalPlayer = player === '직접 입력' ? customPlayer : player;
+
+  async function handleAdd() {
+    if (!minute || !finalPlayer) return;
+    setLoading(true);
+    await addCardEvent({
+      time: Number(minute),
+      side: team === 'KOREA' ? 'away' : 'home',
+      teamName: team === 'KOREA' ? 'Korea Republic' : 'Mexico',
+      player: finalPlayer,
+      cardType,
+    });
+    setMinute(''); setPlayer(''); setCustomPlayer('');
+    setLoading(false);
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <button type="button" onClick={() => { setTeam('KOREA'); setPlayer(''); }}
+          className={`flex-1 rounded-lg border py-2 text-sm font-semibold ${team === 'KOREA' ? 'border-korea-red bg-red-50 text-korea-red' : 'border-border'}`}>
+          🇰🇷 대한민국
+        </button>
+        <button type="button" onClick={() => { setTeam('MEXICO'); setPlayer(''); }}
+          className={`flex-1 rounded-lg border py-2 text-sm font-semibold ${team === 'MEXICO' ? 'border-green-600 bg-green-50 text-green-700' : 'border-border'}`}>
+          🇲🇽 멕시코
+        </button>
+      </div>
+
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-xs text-muted-foreground mb-1">시간 (분)</label>
+          <input type="number" min="1" max="120" value={minute}
+            onChange={(e) => setMinute(e.target.value)} placeholder="예: 34"
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30" />
+        </div>
+        <div className="flex-1">
+          <label className="block text-xs text-muted-foreground mb-1">카드 종류</label>
+          <select value={cardType} onChange={(e) => setCardType(e.target.value as typeof cardType)}
+            className="w-full rounded-lg border px-3 py-2 text-sm">
+            <option value="yellow">🟨 경고</option>
+            <option value="red">🟥 퇴장</option>
+            <option value="yellow_red">🟧 두 번째 경고</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-muted-foreground mb-1">대상 선수</label>
+        <select value={player} onChange={(e) => setPlayer(e.target.value)}
+          className="w-full rounded-lg border px-3 py-2 text-sm">
+          <option value="">선택하세요</option>
+          {players.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+        {player === '직접 입력' && (
+          <input type="text" value={customPlayer} onChange={(e) => setCustomPlayer(e.target.value)}
+            placeholder="선수 이름 직접 입력"
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30" />
+        )}
+      </div>
+
+      <Button onClick={handleAdd} disabled={!minute || !finalPlayer || loading}
+        className="w-full bg-yellow-500 hover:bg-yellow-600 text-white">
+        <Plus className="h-4 w-4 mr-1" />카드 추가
+      </Button>
+    </div>
+  );
+}
+
+// ── 메인 페이지 ───────────────────────────────────────────────────────────────
+
+export default function AdminLivePage() {
+  const [matchState, setMatchState] = useState<MatchStateDoc | null>(null);
+  const [events, setEvents] = useState<MatchEventDoc[]>([]);
+  const [activeTab, setActiveTab] = useState<'status' | 'goal' | 'card'>('status');
+  const [scoreInput, setScoreInput] = useState({ korea: '0', mexico: '0' });
+  const [statusLoading, setStatusLoading] = useState(false);
+
+  useEffect(() => {
+    // 문서가 없으면 초기화
+    initMatchState();
+
+    const unsubState = subscribeMatchState((s) => {
+      setMatchState(s);
+      if (s) setScoreInput({ korea: String(s.koreaScore), mexico: String(s.mexicoScore) });
+    });
+    const unsubEvents = subscribeMatchEvents(setEvents);
+    return () => { unsubState(); unsubEvents(); };
+  }, []);
+
+  async function handleStatusChange(status: MatchStatusShort) {
+    setStatusLoading(true);
+    const payload: Parameters<typeof updateMatchState>[0] = { status };
+    if (status === 'HT' && matchState) {
+      payload.koreaHalfScore = matchState.koreaScore;
+      payload.mexicoHalfScore = matchState.mexicoScore;
+    }
+    await updateMatchState(payload);
+    setStatusLoading(false);
+  }
+
+  async function handleScoreUpdate() {
+    await updateMatchState({
+      koreaScore: Number(scoreInput.korea),
+      mexicoScore: Number(scoreInput.mexico),
+    });
+  }
+
+  const goalEvents = events.filter(
+    (e): e is Extract<MatchEventDoc, { eventKind: 'goal' }> => e.eventKind === 'goal'
+  );
+  const cardEvents = events.filter(
+    (e): e is Extract<MatchEventDoc, { eventKind: 'card' }> => e.eventKind === 'card'
+  );
+
+  if (!matchState) {
+    return (
+      <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
+        Firebase 연결 중...
+      </div>
+    );
+  }
+
+  const currentStatusLabel = STATUS_FLOW.find((s) => s.status === matchState.status)?.label ?? matchState.status;
+
+  return (
+    <div className="space-y-4">
+      {/* 헤더 */}
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/admin"><ChevronLeft className="h-5 w-5" /></Link>
+        </Button>
+        <div>
+          <h1 className="font-bold text-lg">라이브 이벤트 관리</h1>
+          <p className="text-xs text-muted-foreground">골·카드 실시간 입력</p>
+        </div>
+        <Badge className="ml-auto text-xs">{currentStatusLabel}</Badge>
+      </div>
+
+      {/* 현재 스코어 */}
+      <Card className="border-2 border-slate-200">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-center gap-4">
+            <div className="text-center">
+              <span className="text-2xl">🇰🇷</span>
+              <p className="text-xs text-muted-foreground mt-0.5">대한민국</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="number" min="0" max="20" value={scoreInput.korea}
+                onChange={(e) => setScoreInput((p) => ({ ...p, korea: e.target.value }))}
+                className="w-14 text-center text-3xl font-bold border rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-korea-red/30" />
+              <span className="text-2xl font-bold text-muted-foreground">:</span>
+              <input type="number" min="0" max="20" value={scoreInput.mexico}
+                onChange={(e) => setScoreInput((p) => ({ ...p, mexico: e.target.value }))}
+                className="w-14 text-center text-3xl font-bold border rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-green-600/30" />
+            </div>
+            <div className="text-center">
+              <span className="text-2xl">🇲🇽</span>
+              <p className="text-xs text-muted-foreground mt-0.5">멕시코</p>
+            </div>
+          </div>
+          <Button onClick={handleScoreUpdate} variant="outline" size="sm" className="w-full mt-3">
+            스코어 저장
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* 탭 */}
+      <div className="flex rounded-xl border overflow-hidden">
+        {(['status', 'goal', 'card'] as const).map((tab) => (
+          <button key={tab} type="button" onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-2 text-sm font-medium transition-colors ${
+              activeTab === tab ? 'bg-slate-900 text-white' : 'bg-white text-muted-foreground hover:bg-muted/50'
+            }`}>
+            {tab === 'status' ? '⏱ 상태' : tab === 'goal' ? '⚽ 득점' : '🟨 카드'}
+          </button>
+        ))}
+      </div>
+
+      {/* 상태 탭 */}
+      {activeTab === 'status' && (
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm">경기 진행 상태 변경</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {STATUS_FLOW.map((s) => (
+              <button key={s.status} type="button" disabled={statusLoading}
+                onClick={() => handleStatusChange(s.status)}
+                className={`w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                  matchState.status === s.status
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-border hover:bg-muted/50'
+                }`}>
+                <span className={`h-2.5 w-2.5 rounded-full ${s.color} shrink-0`} />
+                <span className="text-sm font-medium">{s.label}</span>
+                {matchState.status === s.status && (
+                  <Badge className="ml-auto text-xs bg-white text-slate-900">현재</Badge>
+                )}
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 득점 탭 */}
+      {activeTab === 'goal' && (
+        <div className="space-y-3">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">득점 추가</CardTitle></CardHeader>
+            <CardContent><GoalForm /></CardContent>
+          </Card>
+
+          {goalEvents.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">등록된 득점 ({goalEvents.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {goalEvents.map((g) => {
+                  const isKorea = g.teamName.toLowerCase().includes('korea');
+                  return (
+                    <div key={g.id} className="flex items-center gap-2 rounded-lg border p-3">
+                      <span className="text-xs text-muted-foreground w-8 shrink-0">{g.time}&apos;</span>
+                      <span>{isKorea ? '🇰🇷' : '🇲🇽'}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium">{g.scorer}</span>
+                        {g.assist && <span className="text-xs text-muted-foreground ml-1">({g.assist})</span>}
+                        {g.goalType !== 'normal' && (
+                          <span className="text-xs text-muted-foreground ml-1">
+                            {g.goalType === 'penalty' ? 'PK' : '자책'}
+                          </span>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="icon" className="text-red-500 h-7 w-7 shrink-0"
+                        onClick={() => deleteMatchEvent(g.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* 카드 탭 */}
+      {activeTab === 'card' && (
+        <div className="space-y-3">
+          <Card>
+            <CardHeader className="pb-2"><CardTitle className="text-sm">카드 추가</CardTitle></CardHeader>
+            <CardContent><CardForm /></CardContent>
+          </Card>
+
+          {cardEvents.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">등록된 카드 ({cardEvents.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {cardEvents.map((c) => {
+                  const isKorea = c.teamName.toLowerCase().includes('korea');
+                  const emoji = c.cardType === 'yellow' ? '🟨' : c.cardType === 'red' ? '🟥' : '🟧';
+                  return (
+                    <div key={c.id} className="flex items-center gap-2 rounded-lg border p-3">
+                      <span className="text-xs text-muted-foreground w-8 shrink-0">{c.time}&apos;</span>
+                      <span>{isKorea ? '🇰🇷' : '🇲🇽'}</span>
+                      <span>{emoji}</span>
+                      <span className="flex-1 text-sm">{c.player}</span>
+                      <Button variant="ghost" size="icon" className="text-red-500 h-7 w-7 shrink-0"
+                        onClick={() => deleteMatchEvent(c.id)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

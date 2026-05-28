@@ -1,55 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, Lock, CheckCircle2, TrendingUp, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Lock, CheckCircle2, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { MATCH_RESULT_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
 import { KOREA_PLAYER_DATA, MEXICO_PLAYER_DATA, type PlayerData } from '@/constants/players';
-import { SCORE_WEIGHTS } from '@/constants/gameConfig';
+import { SCORE_WEIGHTS, GOAL_TIME_ORDER } from '@/constants/gameConfig';
+import { LiveMatchPanel } from '@/components/game/LiveMatchPanel';
+import { subscribeMatchState, type MatchStateDoc } from '@/lib/firebase/matchState';
+import { subscribePredictions, getPrediction, savePrediction, type PredictionDoc } from '@/lib/firebase/predictions';
 
-// ─── 모의 데이터 (Firebase 연동 전) ──────────────────────────────────────────
-
-/** 운영자가 입력한 실제 전반 결과 */
-const MOCK_HALF_RESULT = {
-  koreaHalfScore: 0,
-  mexicoHalfScore: 1,
-  halfTimeResult: 'MEXICO_LEAD' as const,
-  firstGoalOccurred: true,
-  firstGoalTeam: 'MEXICO' as const,
-  firstGoalTimeRange: '0_15' as const,   // 12분
-  koreaFirstScorerConfirmed: false,       // 한국 전반 무득점
-  mexicoFirstScorerConfirmed: true,       // 멕시코 득점 확정
-  mexicoFirstScorer: 'R. 히메네스',
-};
-
-/** 이 참여자의 1차 예측값 */
-const MOCK_MY_PREDICTION = {
-  matchResult: 'KOREA_WIN',
-  koreaScore: '2',
-  mexicoScore: '1',
-  koreaFirstScorer: '손흥민',
-  mexicoFirstScorer: 'R. 히메네스',
-  firstGoalTeam: 'KOREA',
-  firstGoalTimeRange: '16_30',
-  halfTimeResult: 'DRAW',
-  cardRange: '3_5',
-};
-
-/** 전반 기준 중간 점수 */
-const MOCK_INTERMEDIATE = {
-  myScore: 5,
-  ranking: [
-    { name: '이영희', score: 10 },
-    { name: '박민준', score: 10 },
-    { name: '홍길동', score: 5 },
-  ],
-};
-
-// ─── 공통 컴포넌트 ────────────────────────────────────────────────────────────
+// ─── 상수 ─────────────────────────────────────────────────────────────────────
 
 const POSITION_COLOR: Record<string, string> = {
   FW: 'bg-red-100 text-red-700',
@@ -60,6 +25,43 @@ const POSITION_COLOR: Record<string, string> = {
 };
 
 const RANK_MEDAL: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+const HALF_TIME_RESULT_LABEL: Record<string, string> = {
+  KOREA_LEAD: '대한민국 리드',
+  DRAW: '무승부',
+  MEXICO_LEAD: '멕시코 리드',
+};
+
+const FIRST_GOAL_TIME_LABEL: Record<string, string> = {
+  '0_15': '0~15분', '16_30': '16~30분', '31_45': '31~45분+',
+  '46_60': '46~60분', '61_75': '61~75분', '76_90': '76~90분+', 'NONE': '없음',
+};
+
+// ─── 중간 점수 계산 ───────────────────────────────────────────────────────────
+
+function computeIntermediateScore(pred: PredictionDoc, ms: MatchStateDoc): number {
+  let score = 0;
+  if (ms.halfTimeResult && pred.halfTimeResult === ms.halfTimeResult) {
+    score += SCORE_WEIGHTS.halfTimeResult;
+  }
+  if (ms.firstGoalTeam && ms.firstGoalTeam !== 'NONE') {
+    if (pred.firstGoalTeam === ms.firstGoalTeam) score += SCORE_WEIGHTS.firstGoalTeam;
+    if (ms.firstGoalTimeRange) {
+      const predOrder = GOAL_TIME_ORDER[pred.firstGoalTimeRange] ?? -1;
+      const actOrder = GOAL_TIME_ORDER[ms.firstGoalTimeRange] ?? -1;
+      if (predOrder >= 0 && actOrder >= 0) {
+        if (predOrder === actOrder) score += SCORE_WEIGHTS.firstGoalTimeRange;
+        else if (Math.abs(predOrder - actOrder) === 1) score += 5;
+      }
+    }
+    if (ms.koreaFirstScorer && ms.koreaFirstScorer !== '없음' && pred.koreaFirstScorer === ms.koreaFirstScorer) {
+      score += SCORE_WEIGHTS.koreaFirstScorer;
+    }
+  }
+  return score;
+}
+
+// ─── 공통 컴포넌트 ────────────────────────────────────────────────────────────
 
 function LockedOverlay({ reason }: { reason: string }) {
   return (
@@ -172,49 +174,150 @@ function PlayerSelector({
 
 // ─── 메인 페이지 ──────────────────────────────────────────────────────────────
 
-const HALF_TIME_RESULT_LABEL: Record<string, string> = {
-  KOREA_LEAD: '대한민국 리드',
-  DRAW: '무승부',
-  MEXICO_LEAD: '멕시코 리드',
-};
-
-const FIRST_GOAL_TIME_LABEL: Record<string, string> = {
-  '0_15': '0~15분', '16_30': '16~30분', '31_45': '31~45분+',
-  '46_60': '46~60분', '61_75': '61~75분', '76_90': '76~90분+', 'NONE': '없음',
-};
-
 export default function HalfTimePage() {
   const router = useRouter();
-  const half = MOCK_HALF_RESULT;
 
-  // 잠금 조건
-  const firstGoalLocked = half.firstGoalOccurred;           // 첫 골 발생 → 첫 골 팀/시간대 잠금
-  const koreaFirstScorerLocked = half.koreaFirstScorerConfirmed;  // 한국 전반 득점 → 잠금
-  const mexicoFirstScorerLocked = half.mexicoFirstScorerConfirmed; // 멕시코 전반 득점 → 잠금
+  const [loading, setLoading] = useState(true);
+  const [participantId, setParticipantId] = useState<string | null>(null);
+  const [myPrediction, setMyPrediction] = useState<PredictionDoc | null>(null);
+  const [matchState, setMatchState] = useState<MatchStateDoc | null>(null);
+  const [allPredictions, setAllPredictions] = useState<PredictionDoc[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
-  // 수정 가능 필드 초기값 = 1차 예측값
-  const [matchResult, setMatchResult] = useState(MOCK_MY_PREDICTION.matchResult);
-  const [koreaScore, setKoreaScore] = useState(MOCK_MY_PREDICTION.koreaScore);
-  const [mexicoScore, setMexicoScore] = useState(MOCK_MY_PREDICTION.mexicoScore);
-  const [cardRange, setCardRange] = useState(MOCK_MY_PREDICTION.cardRange);
-  const [koreaFirstScorer, setKoreaFirstScorer] = useState(MOCK_MY_PREDICTION.koreaFirstScorer);
-  const [mexicoFirstScorer, setMexicoFirstScorer] = useState(MOCK_MY_PREDICTION.mexicoFirstScorer);
+  const [matchResult, setMatchResult] = useState('');
+  const [koreaScore, setKoreaScore] = useState('');
+  const [mexicoScore, setMexicoScore] = useState('');
+  const [cardRange, setCardRange] = useState('');
+  const [koreaFirstScorer, setKoreaFirstScorer] = useState('');
+  const [mexicoFirstScorer, setMexicoFirstScorer] = useState('');
+
+  useEffect(() => {
+    const id = typeof window !== 'undefined' ? localStorage.getItem('wc_participant_id') : null;
+    setParticipantId(id);
+    if (id) {
+      getPrediction(id).then((pred) => {
+        if (pred) {
+          setMyPrediction(pred);
+          setMatchResult(pred.matchResult);
+          setKoreaScore(String(pred.koreaScore));
+          setMexicoScore(String(pred.mexicoScore));
+          setCardRange(pred.cardRange);
+          setKoreaFirstScorer(pred.koreaFirstScorer);
+          setMexicoFirstScorer(pred.mexicoFirstScorer);
+        }
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => subscribeMatchState(setMatchState), []);
+  useEffect(() => subscribePredictions(setAllPredictions), []);
+
+  const firstGoalTeam = matchState?.firstGoalTeam ?? 'NONE';
+  const firstGoalOccurred = firstGoalTeam !== 'NONE';
+  const koreaFirstScorerLocked = !!(matchState?.koreaFirstScorer && matchState.koreaFirstScorer !== '없음');
+  const mexicoFirstScorerLocked = !!(matchState?.mexicoFirstScorer && matchState.mexicoFirstScorer !== '없음');
+
+  const intermediateRanking = matchState
+    ? [...allPredictions]
+        .map((p) => ({ name: p.name, score: computeIntermediateScore(p, matchState) }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+    : [];
+
+  const myIntermediateScore =
+    myPrediction && matchState ? computeIntermediateScore(myPrediction, matchState) : 0;
 
   const totalGoals =
-    koreaScore !== '' && mexicoScore !== ''
-      ? Number(koreaScore) + Number(mexicoScore)
-      : null;
+    koreaScore !== '' && mexicoScore !== '' ? Number(koreaScore) + Number(mexicoScore) : null;
 
-  function handleSubmit(e: { preventDefault(): void }) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
-    // TODO: Firebase 저장
-    alert('하프타임 수정이 제출되었습니다!');
-    router.push('/');
+    if (!myPrediction || !participantId) return;
+    setSubmitting(true);
+    try {
+      await savePrediction(participantId, {
+        name: myPrediction.name,
+        team: myPrediction.team,
+        matchResult,
+        koreaScore: Number(koreaScore),
+        mexicoScore: Number(mexicoScore),
+        koreaFirstScorer,
+        mexicoFirstScorer,
+        firstGoalTeam: myPrediction.firstGoalTeam,
+        firstGoalTimeRange: myPrediction.firstGoalTimeRange,
+        halfTimeResult: myPrediction.halfTimeResult,
+        cardRange,
+        mvp: myPrediction.mvp,
+        finalMvp: myPrediction.finalMvp,
+        comment: myPrediction.comment,
+        halftimeRevised: true,
+      });
+      router.push('/');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">예측 정보를 불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (!participantId || !myPrediction) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/"><ChevronLeft className="h-5 w-5" /></Link>
+          </Button>
+          <h1 className="font-bold text-lg">하프타임 수정</h1>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
+            <p className="text-muted-foreground text-sm">
+              예측을 먼저 제출해야 하프타임 수정을 할 수 있어요.
+            </p>
+            <Button variant="korea" asChild>
+              <Link href="/predict">예측 제출하러 가기</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (myPrediction.halftimeRevised) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/"><ChevronLeft className="h-5 w-5" /></Link>
+          </Button>
+          <h1 className="font-bold text-lg">하프타임 수정</h1>
+        </div>
+        <Card className="border-green-200 bg-green-50">
+          <CardContent className="flex flex-col items-center gap-2 p-8 text-center">
+            <CheckCircle2 className="h-10 w-10 text-green-500" />
+            <p className="font-semibold">하프타임 수정을 이미 완료했어요</p>
+            <p className="text-sm text-muted-foreground">수정은 1회만 가능합니다.</p>
+            <Button variant="korea" asChild className="mt-2">
+              <Link href="/">홈으로</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* 헤더 */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/"><ChevronLeft className="h-5 w-5" /></Link>
@@ -225,70 +328,72 @@ export default function HalfTimePage() {
         </div>
       </div>
 
-      {/* 전반 실제 결과 */}
-      <Card className="border-slate-300 bg-slate-50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">전반전 실제 결과</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* 스코어 */}
-          <div className="flex items-center justify-center gap-6">
-            <div className="text-center">
-              <span className="text-2xl">🇰🇷</span>
-              <p className="text-xs text-muted-foreground mt-1">대한민국</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <span className="text-4xl font-bold">{half.koreaHalfScore}</span>
-              <span className="text-2xl text-muted-foreground">:</span>
-              <span className="text-4xl font-bold">{half.mexicoHalfScore}</span>
-            </div>
-            <div className="text-center">
-              <span className="text-2xl">🇲🇽</span>
-              <p className="text-xs text-muted-foreground mt-1">멕시코</p>
-            </div>
-          </div>
+      <LiveMatchPanel compact />
 
-          {/* 전반 세부 */}
-          <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="rounded-lg bg-white border p-3">
-              <p className="text-xs text-muted-foreground mb-1">전반 결과</p>
-              <p className="font-semibold">{HALF_TIME_RESULT_LABEL[half.halfTimeResult]}</p>
+      {/* 전반 실제 결과 */}
+      {matchState?.koreaHalfScore !== null && matchState?.koreaHalfScore !== undefined && (
+        <Card className="border-slate-300 bg-slate-50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">전반전 실제 결과</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-center gap-6">
+              <div className="text-center">
+                <span className="text-2xl">🇰🇷</span>
+                <p className="text-xs text-muted-foreground mt-1">대한민국</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-4xl font-bold">{matchState.koreaHalfScore}</span>
+                <span className="text-2xl text-muted-foreground">:</span>
+                <span className="text-4xl font-bold">{matchState.mexicoHalfScore}</span>
+              </div>
+              <div className="text-center">
+                <span className="text-2xl">🇲🇽</span>
+                <p className="text-xs text-muted-foreground mt-1">멕시코</p>
+              </div>
             </div>
-            <div className="rounded-lg bg-white border p-3">
-              <p className="text-xs text-muted-foreground mb-1">첫 골 팀</p>
-              <p className="font-semibold">
-                {half.firstGoalOccurred
-                  ? half.firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : '🇲🇽 멕시코'
-                  : '없음'}
-              </p>
+
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-lg bg-white border p-3">
+                <p className="text-xs text-muted-foreground mb-1">전반 결과</p>
+                <p className="font-semibold">{HALF_TIME_RESULT_LABEL[matchState.halfTimeResult ?? ''] ?? '-'}</p>
+              </div>
+              <div className="rounded-lg bg-white border p-3">
+                <p className="text-xs text-muted-foreground mb-1">첫 골 팀</p>
+                <p className="font-semibold">
+                  {firstGoalOccurred
+                    ? firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : '🇲🇽 멕시코'
+                    : '없음'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-white border p-3">
+                <p className="text-xs text-muted-foreground mb-1">첫 골 시간대</p>
+                <p className="font-semibold">
+                  {firstGoalOccurred ? FIRST_GOAL_TIME_LABEL[matchState.firstGoalTimeRange ?? 'NONE'] : '없음'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-white border p-3">
+                <p className="text-xs text-muted-foreground mb-1">멕시코 첫 득점자</p>
+                <p className="font-semibold">{matchState.mexicoFirstScorer ?? '없음'}</p>
+              </div>
             </div>
-            <div className="rounded-lg bg-white border p-3">
-              <p className="text-xs text-muted-foreground mb-1">첫 골 시간대</p>
-              <p className="font-semibold">
-                {half.firstGoalOccurred ? FIRST_GOAL_TIME_LABEL[half.firstGoalTimeRange ?? 'NONE'] : '없음'}
-              </p>
-            </div>
-            <div className="rounded-lg bg-white border p-3">
-              <p className="text-xs text-muted-foreground mb-1">멕시코 첫 득점자</p>
-              <p className="font-semibold">{half.mexicoFirstScorer ?? '없음'}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 내 중간 점수 + 순위 */}
       <div className="grid grid-cols-2 gap-3">
         <Card className="border-korea-red/30 bg-red-50/40">
           <CardContent className="flex flex-col items-center p-4 gap-1">
             <p className="text-xs text-muted-foreground">내 중간 점수</p>
-            <span className="text-3xl font-bold text-korea-red">{MOCK_INTERMEDIATE.myScore}</span>
+            <span className="text-3xl font-bold text-korea-red">{myIntermediateScore}</span>
             <p className="text-xs text-muted-foreground">/ 20점 확정</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-3 space-y-1.5">
             <p className="text-xs font-medium text-muted-foreground">중간 순위</p>
-            {MOCK_INTERMEDIATE.ranking.map((r, i) => (
+            {intermediateRanking.map((r, i) => (
               <div key={r.name} className="flex items-center justify-between text-sm">
                 <span>{RANK_MEDAL[i + 1]} {r.name}</span>
                 <span className="font-bold">{r.score}점</span>
@@ -298,7 +403,6 @@ export default function HalfTimePage() {
         </Card>
       </div>
 
-      {/* 안내 배너 */}
       <div className="flex items-start gap-2 rounded-lg border border-yellow-300 bg-yellow-50 p-3 text-xs text-yellow-800">
         <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
         <p>
@@ -307,7 +411,7 @@ export default function HalfTimePage() {
         </p>
       </div>
 
-      {/* ── 경기 결과 (수정 가능) ── */}
+      {/* 경기 결과 */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel title="경기 결과" points={SCORE_WEIGHTS.matchResult} locked={false} />
@@ -322,7 +426,7 @@ export default function HalfTimePage() {
         </CardContent>
       </Card>
 
-      {/* ── 최종 스코어 (수정 가능) ── */}
+      {/* 최종 스코어 */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel title="최종 스코어" points={SCORE_WEIGHTS.exactScore} locked={false} />
@@ -355,7 +459,7 @@ export default function HalfTimePage() {
         </CardContent>
       </Card>
 
-      {/* ── 대한민국 첫 득점자 ── */}
+      {/* 대한민국 첫 득점자 */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel
@@ -369,7 +473,7 @@ export default function HalfTimePage() {
         </CardHeader>
         <CardContent>
           {koreaFirstScorerLocked
-            ? <LockedOverlay reason={`전반 첫 득점자 확정: ${MOCK_MY_PREDICTION.koreaFirstScorer}`} />
+            ? <LockedOverlay reason={`전반 첫 득점자 확정: ${matchState?.koreaFirstScorer}`} />
             : <PlayerSelector
                 name="koreaFirstScorer"
                 players={KOREA_PLAYER_DATA}
@@ -381,7 +485,7 @@ export default function HalfTimePage() {
         </CardContent>
       </Card>
 
-      {/* ── 멕시코 첫 득점자 ── */}
+      {/* 멕시코 첫 득점자 */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel
@@ -395,7 +499,7 @@ export default function HalfTimePage() {
         </CardHeader>
         <CardContent>
           {mexicoFirstScorerLocked
-            ? <LockedOverlay reason={`전반 첫 득점자 확정: ${half.mexicoFirstScorer}`} />
+            ? <LockedOverlay reason={`전반 첫 득점자 확정: ${matchState?.mexicoFirstScorer}`} />
             : <PlayerSelector
                 name="mexicoFirstScorer"
                 players={MEXICO_PLAYER_DATA}
@@ -407,43 +511,55 @@ export default function HalfTimePage() {
         </CardContent>
       </Card>
 
-      {/* ── 첫 골 팀 / 시간대 (조건부) ── */}
+      {/* 첫 골 팀 (항상 잠금) */}
       <Card>
         <CardHeader className="pb-3">
-          <SectionLabel title="첫 골 팀" points={SCORE_WEIGHTS.firstGoalTeam} locked={firstGoalLocked} />
-          {firstGoalLocked && (
+          <SectionLabel title="첫 골 팀" points={SCORE_WEIGHTS.firstGoalTeam} locked={true} />
+          {firstGoalOccurred && (
             <p className="text-xs text-muted-foreground">전반에 첫 골이 발생해 확정되었어요</p>
           )}
         </CardHeader>
         <CardContent>
           <LockedOverlay
-            reason={`전반 첫 골 팀 확정: ${half.firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : '🇲🇽 멕시코'}`}
+            reason={firstGoalOccurred
+              ? `전반 첫 골 팀 확정: ${firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : '🇲🇽 멕시코'}`
+              : '전반 무득점 — 예측값 유지'
+            }
           />
         </CardContent>
       </Card>
 
+      {/* 첫 골 시간대 (항상 잠금) */}
       <Card>
         <CardHeader className="pb-3">
-          <SectionLabel title="첫 골 시간대" points={SCORE_WEIGHTS.firstGoalTimeRange} locked={firstGoalLocked} />
+          <SectionLabel title="첫 골 시간대" points={SCORE_WEIGHTS.firstGoalTimeRange} locked={true} />
         </CardHeader>
         <CardContent>
           <LockedOverlay
-            reason={`전반 첫 골 시간대 확정: ${FIRST_GOAL_TIME_LABEL[half.firstGoalTimeRange ?? 'NONE']}`}
+            reason={firstGoalOccurred
+              ? `전반 첫 골 시간대 확정: ${FIRST_GOAL_TIME_LABEL[matchState?.firstGoalTimeRange ?? 'NONE']}`
+              : '전반 무득점 — 예측값 유지'
+            }
           />
         </CardContent>
       </Card>
 
-      {/* ── 전반전 결과 (항상 잠금) ── */}
+      {/* 전반전 결과 (항상 잠금) */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel title="전반전 결과" points={SCORE_WEIGHTS.halfTimeResult} locked={true} />
         </CardHeader>
         <CardContent>
-          <LockedOverlay reason={`전반 종료 기준 확정: ${HALF_TIME_RESULT_LABEL[half.halfTimeResult]}`} />
+          <LockedOverlay
+            reason={matchState?.halfTimeResult
+              ? `전반 종료 기준 확정: ${HALF_TIME_RESULT_LABEL[matchState.halfTimeResult]}`
+              : '전반 결과 대기 중'
+            }
+          />
         </CardContent>
       </Card>
 
-      {/* ── 카드 수 (수정 가능) ── */}
+      {/* 카드 수 */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel title="양 팀 합산 카드 수" points={SCORE_WEIGHTS.cardRange} locked={false} />
@@ -458,9 +574,8 @@ export default function HalfTimePage() {
         </CardContent>
       </Card>
 
-      {/* 제출 버튼 */}
-      <Button type="submit" variant="korea" size="xl" className="w-full">
-        하프타임 수정 제출하기
+      <Button type="submit" variant="korea" size="xl" className="w-full" disabled={submitting}>
+        {submitting ? '제출 중...' : '하프타임 수정 제출하기'}
       </Button>
 
       <p className="text-center text-xs text-muted-foreground pb-4">

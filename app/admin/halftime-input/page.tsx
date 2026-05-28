@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { updateMatchState } from '@/lib/firebase/matchState';
+import { setGameStatus } from '@/lib/firebase/gameStatus';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,6 +86,7 @@ export default function HalftimeInputPage() {
   const [mexicoFirstScorer, setMexicoFirstScorer] = useState('');
   const [halfCards, setHalfCards] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const koreaNum = Number(koreaHalf);
   const mexicoNum = Number(mexicoHalf);
@@ -108,13 +111,28 @@ export default function HalftimeInputPage() {
     (!mexicoScored || mexicoFirstScorer !== '') &&
     halfCards !== '';
 
-  function handleSubmit(e: { preventDefault(): void }) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!isValid) return;
     if (!showConfirm) { setShowConfirm(true); return; }
-    // TODO: Firebase 저장 + gameStatus → HALF_TIME 전환
-    alert('전반 결과가 저장되었습니다. 하프타임 수정이 오픈됩니다.');
-    router.push('/admin');
+    setSubmitting(true);
+    try {
+      const halfResult = koreaNum > mexicoNum ? 'KOREA_LEAD' : koreaNum < mexicoNum ? 'MEXICO_LEAD' : 'DRAW';
+      await updateMatchState({
+        koreaHalfScore: koreaNum,
+        mexicoHalfScore: mexicoNum,
+        halfTimeResult: halfResult,
+        firstGoalTeam: firstGoalTeam || 'NONE',
+        firstGoalTimeRange: firstGoalOccurred ? firstGoalTime : 'NONE',
+        koreaFirstScorer: koreaScored ? koreaFirstScorer : '없음',
+        mexicoFirstScorer: mexicoScored ? mexicoFirstScorer : '없음',
+      });
+      await setGameStatus('HALF_TIME');
+      router.push('/admin');
+    } catch (err) {
+      console.error(err);
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -227,8 +245,8 @@ export default function HalftimeInputPage() {
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowConfirm(false)}>
               수정하기
             </Button>
-            <Button type="submit" variant="korea" className="flex-1">
-              저장 및 오픈
+            <Button type="submit" variant="korea" className="flex-1" disabled={submitting}>
+              {submitting ? '저장 중...' : '저장 및 오픈'}
             </Button>
           </div>
         </div>

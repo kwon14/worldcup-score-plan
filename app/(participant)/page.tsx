@@ -1,30 +1,83 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MatchInfo } from '@/components/game/MatchInfo';
 import { GameStatusBanner } from '@/components/game/GameStatusBanner';
+import { WorldCupInfo } from '@/components/game/WorldCupInfo';
+import { LiveMatchPanel } from '@/components/game/LiveMatchPanel';
 import { Users, Trophy, Clock } from 'lucide-react';
+import { subscribeGameStatus } from '@/lib/firebase/gameStatus';
+import { subscribePredictions } from '@/lib/firebase/predictions';
+import type { GameStatus } from '@/types/game';
 
-// TODO: Firebase에서 실시간으로 가져올 예정
-const MOCK_STATUS = 'BEFORE_MATCH' as const;
-const MOCK_PARTICIPANT_COUNT = 12;
-const MOCK_DEADLINE = '경기 시작 전까지';
+const DEADLINE_LABEL: Partial<Record<GameStatus, string>> = {
+  BEFORE_MATCH: '경기 시작 전까지',
+  FIRST_HALF:   '마감됨',
+  HALF_TIME:    '하프타임 수정 가능',
+  SECOND_HALF:  '마감됨',
+  AFTER_MATCH:  'MVP 수정 가능',
+  RESULT_OPEN:  '결과 공개됨',
+};
 
 export default function HomePage() {
+  const [gameStatus, setGameStatus] = useState<GameStatus>('BEFORE_MATCH');
+  const [participantCount, setParticipantCount] = useState(0);
+
+  useEffect(() => {
+    const unsubStatus = subscribeGameStatus(setGameStatus);
+    const unsubPreds = subscribePredictions((list) => setParticipantCount(list.length));
+    return () => { unsubStatus(); unsubPreds(); };
+  }, []);
+
+  // 게임 상태별 CTA 버튼
+  const ctaButton = (() => {
+    switch (gameStatus) {
+      case 'BEFORE_MATCH':
+        return <Button variant="korea" size="xl" className="w-full" asChild>
+          <Link href="/predict">예측 제출하기</Link>
+        </Button>;
+      case 'HALF_TIME':
+        return <Button variant="korea" size="xl" className="w-full" asChild>
+          <Link href="/halftime">하프타임 수정하기</Link>
+        </Button>;
+      case 'AFTER_MATCH':
+        return <Button variant="korea" size="xl" className="w-full" asChild>
+          <Link href="/mvp">MVP 최종 제출</Link>
+        </Button>;
+      case 'RESULT_OPEN':
+        return <Button variant="korea" size="xl" className="w-full" asChild>
+          <Link href="/result">최종 순위 보기</Link>
+        </Button>;
+      default:
+        return <Button variant="korea" size="xl" className="w-full" disabled>
+          경기 진행 중
+        </Button>;
+    }
+  })();
+
   return (
     <div className="space-y-4">
       {/* 게임 상태 */}
-      <GameStatusBanner status={MOCK_STATUS} />
+      <GameStatusBanner status={gameStatus} />
 
       {/* 경기 정보 */}
       <MatchInfo />
+
+      {/* 실시간 경기 데이터 */}
+      <LiveMatchPanel />
+
+      {/* 월드컵 & 팀 정보 */}
+      <WorldCupInfo />
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-3 gap-3">
         <Card>
           <CardContent className="flex flex-col items-center gap-1 p-4">
             <Users className="h-5 w-5 text-muted-foreground" />
-            <span className="text-2xl font-bold">{MOCK_PARTICIPANT_COUNT}</span>
+            <span className="text-2xl font-bold">{participantCount}</span>
             <span className="text-xs text-muted-foreground">참여자</span>
           </CardContent>
         </Card>
@@ -38,7 +91,9 @@ export default function HomePage() {
         <Card>
           <CardContent className="flex flex-col items-center gap-1 p-4">
             <Clock className="h-5 w-5 text-muted-foreground" />
-            <span className="text-xs font-semibold text-center leading-tight mt-1">경기 전</span>
+            <span className="text-xs font-semibold text-center leading-tight mt-1">
+              {gameStatus === 'BEFORE_MATCH' ? '경기 전' : gameStatus === 'HALF_TIME' ? '하프타임' : gameStatus === 'RESULT_OPEN' ? '종료' : '진행 중'}
+            </span>
             <span className="text-xs text-muted-foreground">마감</span>
           </CardContent>
         </Card>
@@ -53,10 +108,8 @@ export default function HomePage() {
         </CardContent>
       </Card>
 
-      {/* CTA 버튼 */}
-      <Button variant="korea" size="xl" className="w-full" asChild>
-        <Link href="/predict">예측 제출하기</Link>
-      </Button>
+      {/* 상태별 CTA */}
+      {ctaButton}
 
       {/* 보조 링크 */}
       <div className="grid grid-cols-3 gap-3">
@@ -71,9 +124,8 @@ export default function HomePage() {
         </Button>
       </div>
 
-      {/* 마감 안내 */}
       <p className="text-center text-xs text-muted-foreground">
-        1차 예측 마감: {MOCK_DEADLINE}
+        1차 예측 마감: {DEADLINE_LABEL[gameStatus]}
       </p>
     </div>
   );

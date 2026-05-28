@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Lock, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
+import { savePrediction } from '@/lib/firebase/predictions';
 import {
   MATCH_RESULT_OPTIONS,
   FIRST_GOAL_TEAM_OPTIONS,
@@ -175,11 +176,26 @@ export default function PredictPage() {
     cardRange &&
     mvp;
 
-  function handleSubmit(e: { preventDefault(): void }) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!isValid) return;
-    // TODO: Firebase 저장
-    alert('예측이 제출되었습니다!');
+    const participantId = `${name.trim()}_${Date.now()}`;
+    await savePrediction(participantId, {
+      name: name.trim(),
+      team: 'BAP팀',
+      matchResult,
+      koreaScore: Number(koreaScore),
+      mexicoScore: Number(mexicoScore),
+      koreaFirstScorer,
+      mexicoFirstScorer,
+      firstGoalTeam,
+      firstGoalTimeRange,
+      halfTimeResult,
+      cardRange,
+      mvp,
+      comment,
+    });
+    localStorage.setItem('wc_participant_id', participantId);
     router.push('/');
   }
 

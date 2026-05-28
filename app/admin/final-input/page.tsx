@@ -1,7 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { saveActualResult } from '@/lib/firebase/results';
+import { setGameStatus } from '@/lib/firebase/gameStatus';
+import { getMatchState, type MatchStateDoc } from '@/lib/firebase/matchState';
+import type { MatchResult, FirstGoalTeam, FirstGoalTimeRange, HalfTimeResult, CardRange } from '@/types/game';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,6 +65,12 @@ export default function FinalInputPage() {
   const [cardRange, setCardRange] = useState('');
   const [mvp, setMvp] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [matchStateData, setMatchStateData] = useState<MatchStateDoc | null>(null);
+
+  useEffect(() => {
+    getMatchState().then(setMatchStateData);
+  }, []);
 
   const koreaNum = Number(koreaFinal);
   const mexicoNum = Number(mexicoFinal);
@@ -91,13 +101,34 @@ export default function FinalInputPage() {
     cardRange !== '' &&
     mvp !== '';
 
-  function handleSubmit(e: { preventDefault(): void }) {
+  async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!isValid) return;
     if (!showConfirm) { setShowConfirm(true); return; }
-    // TODO: Firebase 저장 + 점수 자동 계산 트리거
-    alert('최종 결과가 저장되었습니다. 점수를 계산합니다.');
-    router.push('/admin');
+    setSubmitting(true);
+    try {
+      const matchResultCode: MatchResult =
+        koreaNum > mexicoNum ? 'KOREA_WIN' : koreaNum < mexicoNum ? 'MEXICO_WIN' : 'DRAW';
+      const halfTimeResultCode: HalfTimeResult =
+        (matchStateData?.halfTimeResult as HalfTimeResult | undefined) ?? 'DRAW';
+      await saveActualResult({
+        matchResult: matchResultCode,
+        koreaScore: koreaNum,
+        mexicoScore: mexicoNum,
+        totalGoals: koreaNum + mexicoNum,
+        koreaFirstScorer,
+        firstGoalTeam: firstGoalTeam as FirstGoalTeam,
+        firstGoalTimeRange: firstGoalTime as FirstGoalTimeRange,
+        halfTimeResult: halfTimeResultCode,
+        cardRange: cardRange as CardRange,
+        officialMvp: mvp,
+      });
+      await setGameStatus('AFTER_MATCH');
+      router.push('/admin');
+    } catch (err) {
+      console.error(err);
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -242,8 +273,8 @@ export default function FinalInputPage() {
             <Button type="button" variant="outline" className="flex-1" onClick={() => setShowConfirm(false)}>
               수정하기
             </Button>
-            <Button type="submit" variant="destructive" className="flex-1">
-              저장 및 점수 계산
+            <Button type="submit" variant="destructive" className="flex-1" disabled={submitting}>
+              {submitting ? '저장 중...' : '저장 및 점수 계산'}
             </Button>
           </div>
         </div>

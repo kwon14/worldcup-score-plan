@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronRight, Users, ClipboardList, Trophy, AlertTriangle } from 'lucide-react';
 import type { GameStatus } from '@/types/game';
 import { GAME_STATUS_LABELS } from '@/lib/game/gameState';
+import { subscribeGameStatus, setGameStatus } from '@/lib/firebase/gameStatus';
+import { subscribePredictions, type PredictionDoc } from '@/lib/firebase/predictions';
 
 // ─── 게임 상태 전환 순서 ─────────────────────────────────────────────────────
 
@@ -37,27 +39,36 @@ const STATUS_DOT: Record<GameStatus, string> = {
   RESULT_OPEN:  'bg-purple-500',
 };
 
-// ─── 목 데이터 ────────────────────────────────────────────────────────────────
-
-const MOCK_STATS = { total: 12, submitted: 12, halftimeRevised: 0, mvpSubmitted: 0 };
-
 // ─── 페이지 ──────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const [status, setStatus] = useState<GameStatus>('BEFORE_MATCH');
   const [confirmNext, setConfirmNext] = useState<GameStatus | null>(null);
+  const [predictions, setPredictions] = useState<PredictionDoc[]>([]);
+
+  useEffect(() => {
+    const unsubStatus = subscribeGameStatus(setStatus);
+    const unsubPreds = subscribePredictions(setPredictions);
+    return () => { unsubStatus(); unsubPreds(); };
+  }, []);
+
+  const stats = {
+    total: predictions.length,
+    submitted: predictions.length,
+    halftimeRevised: predictions.filter((p) => p.halftimeRevised).length,
+    mvpSubmitted: predictions.filter((p) => p.finalMvp).length,
+  };
 
   const nextTransition = STATUS_FLOW.find((f) => f.from === status);
 
-  function handleStatusChange() {
+  async function handleStatusChange() {
     if (!nextTransition) return;
     if (nextTransition.danger && confirmNext !== nextTransition.to) {
       setConfirmNext(nextTransition.to);
       return;
     }
-    setStatus(nextTransition.to);
+    await setGameStatus(nextTransition.to);
     setConfirmNext(null);
-    // TODO: Firebase gameState 업데이트
   }
 
   return (
@@ -121,10 +132,10 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent className="grid grid-cols-2 gap-3">
           {[
-            { label: '전체 참여자', value: MOCK_STATS.total },
-            { label: '1차 예측 완료', value: MOCK_STATS.submitted },
-            { label: '하프타임 수정', value: MOCK_STATS.halftimeRevised },
-            { label: 'MVP 최종 제출', value: MOCK_STATS.mvpSubmitted },
+            { label: '전체 참여자', value: stats.total },
+            { label: '1차 예측 완료', value: stats.submitted },
+            { label: '하프타임 수정', value: stats.halftimeRevised },
+            { label: 'MVP 최종 제출', value: stats.mvpSubmitted },
           ].map(({ label, value }) => (
             <div key={label} className="rounded-lg border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">{label}</p>
@@ -142,6 +153,17 @@ export default function AdminDashboard() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
+          <Link
+            href="/admin/live"
+            className="flex items-center justify-between rounded-lg border border-red-200 bg-red-50 p-3 transition-colors hover:bg-red-100"
+          >
+            <div>
+              <p className="font-medium text-sm text-red-700">🔴 라이브 이벤트 입력</p>
+              <p className="text-xs text-muted-foreground">경기 중 골·카드 실시간 입력</p>
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+
           <Link
             href="/admin/halftime-input"
             className={`flex items-center justify-between rounded-lg border p-3 transition-colors ${

@@ -3,7 +3,7 @@ interface MatchInfoProps {
   venue?: string;
 }
 
-export function MatchInfo({ date = '2026년 6월 19일', venue = '로스앤젤레스' }: MatchInfoProps) {
+export function MatchInfo({ date = '2026년 6월 19일 (KST)', venue = '에스타디오 아크론, 과달라하라' }: MatchInfoProps) {
   return (
     <div className="rounded-xl bg-gradient-to-r from-korea-blue to-korea-red p-6 text-white">
       <p className="text-center text-xs font-medium uppercase tracking-widest opacity-80">

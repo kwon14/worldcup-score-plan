@@ -71,3 +71,42 @@ export function calculateScore(
     mvp: pred.mvp === actual.officialMvp ? SCORE_WEIGHTS.mvp : 0,
   };
 }
+
+// ── Firebase PredictionDoc 기반 점수 계산 ─────────────────────────────────────
+
+interface ScoringInput {
+  matchResult: string;
+  koreaScore: number;
+  mexicoScore: number;
+  koreaFirstScorer: string;
+  firstGoalTeam: string;
+  firstGoalTimeRange: string;
+  halfTimeResult: string;
+  cardRange: string;
+  mvp: string;
+  finalMvp?: string;
+}
+
+export function computeScoreBreakdown(
+  pred: ScoringInput,
+  actual: ActualResult,
+): ScoreBreakdown {
+  const effectiveMvp = pred.finalMvp ?? pred.mvp;
+  const totalGoals = pred.koreaScore + pred.mexicoScore;
+  const actualTotal = actual.koreaScore + actual.mexicoScore;
+
+  return {
+    matchResult: pred.matchResult === actual.matchResult ? SCORE_WEIGHTS.matchResult : 0,
+    exactScore: scoreExactScore(
+      { koreaScore: pred.koreaScore, mexicoScore: pred.mexicoScore, matchResult: pred.matchResult },
+      actual,
+    ),
+    totalGoals: scoreTotalGoals(totalGoals, actualTotal),
+    koreaFirstScorer: pred.koreaFirstScorer === actual.koreaFirstScorer ? SCORE_WEIGHTS.koreaFirstScorer : 0,
+    firstGoalTimeRange: scoreFirstGoalTimeRange(pred.firstGoalTimeRange, actual.firstGoalTimeRange),
+    firstGoalTeam: pred.firstGoalTeam === actual.firstGoalTeam ? SCORE_WEIGHTS.firstGoalTeam : 0,
+    halfTimeResult: pred.halfTimeResult === actual.halfTimeResult ? SCORE_WEIGHTS.halfTimeResult : 0,
+    cardRange: pred.cardRange === actual.cardRange ? SCORE_WEIGHTS.cardRange : 0,
+    mvp: effectiveMvp === actual.officialMvp ? SCORE_WEIGHTS.mvp : 0,
+  };
+}
