@@ -86,7 +86,7 @@ export function subscribeMatchState(
 ): Unsubscribe {
   return onSnapshot(matchStateRef(), (snap) => {
     cb(snap.exists() ? (snap.data() as MatchStateDoc) : null);
-  });
+  }, () => cb(null));
 }
 
 export function subscribeMatchEvents(

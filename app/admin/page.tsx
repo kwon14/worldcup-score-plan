@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, Users, ClipboardList, Trophy, AlertTriangle } from 'lucide-react';
+import { ChevronRight, Users, ClipboardList, Trophy, AlertTriangle, DatabaseZap, Trash2 } from 'lucide-react';
 import type { GameStatus } from '@/types/game';
 import { GAME_STATUS_LABELS } from '@/lib/game/gameState';
 import { subscribeGameStatus, setGameStatus } from '@/lib/firebase/gameStatus';
 import { subscribePredictions, type PredictionDoc } from '@/lib/firebase/predictions';
+import { seedSampleData, resetAllData } from '@/lib/firebase/seed';
 
 // ─── 게임 상태 전환 순서 ─────────────────────────────────────────────────────
 
@@ -45,6 +46,9 @@ export default function AdminDashboard() {
   const [status, setStatus] = useState<GameStatus>('BEFORE_MATCH');
   const [confirmNext, setConfirmNext] = useState<GameStatus | null>(null);
   const [predictions, setPredictions] = useState<PredictionDoc[]>([]);
+  const [seeding, setSeeding] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
     const unsubStatus = subscribeGameStatus(setStatus);
@@ -60,6 +64,17 @@ export default function AdminDashboard() {
   };
 
   const nextTransition = STATUS_FLOW.find((f) => f.from === status);
+
+  async function handleSeed() {
+    setSeeding(true);
+    try { await seedSampleData(); } finally { setSeeding(false); }
+  }
+
+  async function handleReset() {
+    if (!confirmReset) { setConfirmReset(true); return; }
+    setResetting(true);
+    try { await resetAllData(); } finally { setResetting(false); setConfirmReset(false); }
+  }
 
   async function handleStatusChange() {
     if (!nextTransition) return;
@@ -199,6 +214,50 @@ export default function AdminDashboard() {
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </div>
           </Link>
+        </CardContent>
+      </Card>
+
+      {/* 데이터 관리 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <DatabaseZap className="h-4 w-4" /> 데이터 관리
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleSeed}
+            disabled={seeding || resetting}
+          >
+            {seeding ? '샘플 데이터 추가 중...' : '샘플 데이터 세팅'}
+          </Button>
+
+          {confirmReset ? (
+            <div className="space-y-2">
+              <div className="flex items-start gap-2 rounded-lg border border-red-300 bg-red-50 p-3 text-xs text-red-700">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <p><strong>모든 예측 데이터가 삭제됩니다.</strong> 되돌릴 수 없어요. 계속하시겠어요?</p>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setConfirmReset(false)}>취소</Button>
+                <Button variant="destructive" className="flex-1" onClick={handleReset} disabled={resetting}>
+                  {resetting ? '초기화 중...' : '네, 초기화합니다'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full border-red-200 text-red-600 hover:bg-red-50"
+              onClick={handleReset}
+              disabled={seeding || resetting}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              전체 데이터 초기화
+            </Button>
+          )}
         </CardContent>
       </Card>
 

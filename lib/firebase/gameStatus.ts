@@ -16,5 +16,5 @@ export async function setGameStatus(status: GameStatus) {
 export function subscribeGameStatus(cb: (status: GameStatus) => void): Unsubscribe {
   return onSnapshot(gameStatusRef(), (snap) => {
     cb(snap.exists() ? (snap.data().status as GameStatus) : 'BEFORE_MATCH');
-  });
+  }, () => cb('BEFORE_MATCH'));
 }

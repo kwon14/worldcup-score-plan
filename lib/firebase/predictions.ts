@@ -57,5 +57,5 @@ export async function getAllPredictions(): Promise<PredictionDoc[]> {
 export function subscribePredictions(cb: (list: PredictionDoc[]) => void): Unsubscribe {
   return onSnapshot(query(predictionsRef(), orderBy('createdAt', 'asc')), (snap) => {
     cb(snap.docs.map((d) => d.data() as PredictionDoc));
-  });
+  }, () => cb([]));
 }

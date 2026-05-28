@@ -13,5 +13,5 @@ export async function saveActualResult(data: ActualResult): Promise<void> {
 export function subscribeActualResult(cb: (result: ActualResultDoc | null) => void): Unsubscribe {
   return onSnapshot(resultRef(), (snap) => {
     cb(snap.exists() ? (snap.data() as ActualResultDoc) : null);
-  });
+  }, () => cb(null));
 }

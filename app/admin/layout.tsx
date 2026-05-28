@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldCheck, Lock } from 'lucide-react';
 
-// TODO: 환경변수 기반 or Firebase Auth로 교체
-const ADMIN_PIN = '1234';
+const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? '0619';
 const SESSION_KEY = 'admin_authed';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
