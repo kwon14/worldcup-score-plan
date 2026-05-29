@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, Trophy, CheckCircle2, Loader2 } from 'lucide-react';
-import { KOREA_PLAYER_DATA, MEXICO_PLAYER_DATA } from '@/constants/players';
+import { KOREA_PLAYER_DATA } from '@/constants/players';
 import { getPrediction, savePrediction, type PredictionDoc } from '@/lib/firebase/predictions';
+import { useMatch } from '@/contexts/MatchContext';
 
 export default function MvpPage() {
+  const { matchId, match } = useMatch();
   const [loading, setLoading] = useState(true);
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [myPrediction, setMyPrediction] = useState<PredictionDoc | null>(null);
@@ -17,10 +19,10 @@ export default function MvpPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const id = typeof window !== 'undefined' ? localStorage.getItem('wc_participant_id') : null;
+    const id = typeof window !== 'undefined' ? localStorage.getItem(`wc_participant_id_${matchId}`) : null;
     setParticipantId(id);
     if (id) {
-      getPrediction(id).then((pred) => {
+      getPrediction(matchId, id).then((pred) => {
         if (pred) {
           setMyPrediction(pred);
           setMvp(pred.finalMvp ?? pred.mvp);
@@ -35,7 +37,7 @@ export default function MvpPage() {
 
   const allPlayers = [
     ...KOREA_PLAYER_DATA.filter((p) => p.name !== '없음'),
-    ...MEXICO_PLAYER_DATA.filter((p) => p.name !== '없음'),
+    ...match.awayPlayerData.filter((p) => p.name !== '없음'),
   ];
 
   async function handleSubmit(e: { preventDefault(): void }) {
@@ -43,7 +45,7 @@ export default function MvpPage() {
     if (!myPrediction || !participantId || !mvp) return;
     setSubmitting(true);
     try {
-      await savePrediction(participantId, {
+      await savePrediction(matchId, participantId, {
         name: myPrediction.name,
         team: myPrediction.team,
         matchResult: myPrediction.matchResult,
@@ -172,7 +174,7 @@ export default function MvpPage() {
                   />
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{isKorea ? '🇰🇷' : '🇲🇽'} {p.position}</p>
+                    <p className="text-xs text-muted-foreground">{isKorea ? '🇰🇷' : match.awayTeamFlag} {p.position}</p>
                   </div>
                 </label>
               );

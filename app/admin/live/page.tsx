@@ -13,6 +13,8 @@ import {
   initMatchState,
 } from '@/lib/firebase/matchState';
 import type { MatchStateDoc, MatchEventDoc } from '@/lib/firebase/matchState';
+import { useMatch } from '@/contexts/MatchContext';
+import { KOREA_PLAYER_DATA } from '@/constants/players';
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
 
@@ -24,12 +26,15 @@ const STATUS_FLOW: { status: MatchStatusShort; label: string; color: string }[] 
   { status: 'FT',  label: '경기 종료', color: 'bg-red-600' },
 ];
 
-const KOREA_PLAYERS = ['손흥민','이강인','김민재','황희찬','이재성','조규성','오현규','박용우','정우영','설영우','김태환','김문환','이기혁','이동경','직접 입력'];
-const MEXICO_PLAYERS = ['S.히메네스','H.로사노','A.비달','G.도스 산토스','A.마르틴','J.산체스','E.알바레스','G.아르타가','R.히메네스','직접 입력'];
+const KOREA_PLAYERS = [...KOREA_PLAYER_DATA.filter((p) => p.name !== '없음').map((p) => p.name), '직접 입력'];
 
 // ── GoalForm ──────────────────────────────────────────────────────────────────
 
-function GoalForm() {
+function GoalForm({
+  matchId, awayPlayers, awayTeamFlag, awayTeamName,
+}: {
+  matchId: string; awayPlayers: string[]; awayTeamFlag: string; awayTeamName: string;
+}) {
   const [team, setTeam] = useState<'KOREA' | 'MEXICO'>('KOREA');
   const [minute, setMinute] = useState('');
   const [scorer, setScorer] = useState('');
@@ -38,17 +43,17 @@ function GoalForm() {
   const [type, setType] = useState<'normal' | 'penalty' | 'own_goal'>('normal');
   const [loading, setLoading] = useState(false);
 
-  const players = team === 'KOREA' ? KOREA_PLAYERS : MEXICO_PLAYERS;
+  const players = team === 'KOREA' ? KOREA_PLAYERS : awayPlayers;
   const finalScorer = scorer === '직접 입력' ? customScorer : scorer;
 
   async function handleAdd() {
     if (!minute || !finalScorer) return;
     setLoading(true);
-    await addGoalEvent({
+    await addGoalEvent(matchId, {
       time: Number(minute),
       extraTime: null,
       side: team === 'KOREA' ? 'away' : 'home',
-      teamName: team === 'KOREA' ? 'Korea Republic' : 'Mexico',
+      teamName: team === 'KOREA' ? 'Korea Republic' : awayTeamName,
       scorer: finalScorer,
       assist: assist || null,
       type,
@@ -66,7 +71,7 @@ function GoalForm() {
         </button>
         <button type="button" onClick={() => { setTeam('MEXICO'); setScorer(''); }}
           className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${team === 'MEXICO' ? 'border-green-600 bg-green-50 text-green-700' : 'border-border'}`}>
-          🇲🇽 멕시코
+          {awayTeamFlag} {awayTeamName}
         </button>
       </div>
 
@@ -119,7 +124,11 @@ function GoalForm() {
 
 // ── CardForm ──────────────────────────────────────────────────────────────────
 
-function CardForm() {
+function CardForm({
+  matchId, awayPlayers, awayTeamFlag, awayTeamName,
+}: {
+  matchId: string; awayPlayers: string[]; awayTeamFlag: string; awayTeamName: string;
+}) {
   const [team, setTeam] = useState<'KOREA' | 'MEXICO'>('KOREA');
   const [minute, setMinute] = useState('');
   const [player, setPlayer] = useState('');
@@ -127,16 +136,16 @@ function CardForm() {
   const [cardType, setCardType] = useState<'yellow' | 'red' | 'yellow_red'>('yellow');
   const [loading, setLoading] = useState(false);
 
-  const players = team === 'KOREA' ? KOREA_PLAYERS : MEXICO_PLAYERS;
+  const players = team === 'KOREA' ? KOREA_PLAYERS : awayPlayers;
   const finalPlayer = player === '직접 입력' ? customPlayer : player;
 
   async function handleAdd() {
     if (!minute || !finalPlayer) return;
     setLoading(true);
-    await addCardEvent({
+    await addCardEvent(matchId, {
       time: Number(minute),
       side: team === 'KOREA' ? 'away' : 'home',
-      teamName: team === 'KOREA' ? 'Korea Republic' : 'Mexico',
+      teamName: team === 'KOREA' ? 'Korea Republic' : awayTeamName,
       player: finalPlayer,
       cardType,
     });
@@ -153,7 +162,7 @@ function CardForm() {
         </button>
         <button type="button" onClick={() => { setTeam('MEXICO'); setPlayer(''); }}
           className={`flex-1 rounded-lg border py-2 text-sm font-semibold ${team === 'MEXICO' ? 'border-green-600 bg-green-50 text-green-700' : 'border-border'}`}>
-          🇲🇽 멕시코
+          {awayTeamFlag} {awayTeamName}
         </button>
       </div>
 
@@ -200,37 +209,39 @@ function CardForm() {
 // ── 메인 페이지 ───────────────────────────────────────────────────────────────
 
 export default function AdminLivePage() {
+  const { matchId, match } = useMatch();
   const [matchState, setMatchState] = useState<MatchStateDoc | null>(null);
   const [events, setEvents] = useState<MatchEventDoc[]>([]);
   const [activeTab, setActiveTab] = useState<'status' | 'goal' | 'card'>('status');
   const [scoreInput, setScoreInput] = useState({ korea: '0', mexico: '0' });
   const [statusLoading, setStatusLoading] = useState(false);
 
-  useEffect(() => {
-    // 문서가 없으면 초기화
-    initMatchState();
+  const awayPlayers = [...match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => p.name), '직접 입력'];
 
-    const unsubState = subscribeMatchState((s) => {
+  useEffect(() => {
+    initMatchState(matchId);
+
+    const unsubState = subscribeMatchState(matchId, (s) => {
       setMatchState(s);
       if (s) setScoreInput({ korea: String(s.koreaScore), mexico: String(s.mexicoScore) });
     });
-    const unsubEvents = subscribeMatchEvents(setEvents);
+    const unsubEvents = subscribeMatchEvents(matchId, setEvents);
     return () => { unsubState(); unsubEvents(); };
-  }, []);
+  }, [matchId]);
 
   async function handleStatusChange(status: MatchStatusShort) {
     setStatusLoading(true);
-    const payload: Parameters<typeof updateMatchState>[0] = { status };
+    const payload: Partial<Omit<MatchStateDoc, 'updatedAt'>> = { status };
     if (status === 'HT' && matchState) {
       payload.koreaHalfScore = matchState.koreaScore;
       payload.mexicoHalfScore = matchState.mexicoScore;
     }
-    await updateMatchState(payload);
+    await updateMatchState(matchId, payload);
     setStatusLoading(false);
   }
 
   async function handleScoreUpdate() {
-    await updateMatchState({
+    await updateMatchState(matchId, {
       koreaScore: Number(scoreInput.korea),
       mexicoScore: Number(scoreInput.mexico),
     });
@@ -285,8 +296,8 @@ export default function AdminLivePage() {
                 className="w-14 text-center text-3xl font-bold border rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-green-600/30" />
             </div>
             <div className="text-center">
-              <span className="text-2xl">🇲🇽</span>
-              <p className="text-xs text-muted-foreground mt-0.5">멕시코</p>
+              <span className="text-2xl">{match.awayTeamFlag}</span>
+              <p className="text-xs text-muted-foreground mt-0.5">{match.awayTeamName}</p>
             </div>
           </div>
           <Button onClick={handleScoreUpdate} variant="outline" size="sm" className="w-full mt-3">
@@ -336,7 +347,14 @@ export default function AdminLivePage() {
         <div className="space-y-3">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">득점 추가</CardTitle></CardHeader>
-            <CardContent><GoalForm /></CardContent>
+            <CardContent>
+              <GoalForm
+                matchId={matchId}
+                awayPlayers={awayPlayers}
+                awayTeamFlag={match.awayTeamFlag}
+                awayTeamName={match.awayTeamName}
+              />
+            </CardContent>
           </Card>
 
           {goalEvents.length > 0 && (
@@ -350,7 +368,7 @@ export default function AdminLivePage() {
                   return (
                     <div key={g.id} className="flex items-center gap-2 rounded-lg border p-3">
                       <span className="text-xs text-muted-foreground w-8 shrink-0">{g.time}&apos;</span>
-                      <span>{isKorea ? '🇰🇷' : '🇲🇽'}</span>
+                      <span>{isKorea ? '🇰🇷' : match.awayTeamFlag}</span>
                       <div className="flex-1 min-w-0">
                         <span className="text-sm font-medium">{g.scorer}</span>
                         {g.assist && <span className="text-xs text-muted-foreground ml-1">({g.assist})</span>}
@@ -361,7 +379,7 @@ export default function AdminLivePage() {
                         )}
                       </div>
                       <Button variant="ghost" size="icon" className="text-red-500 h-7 w-7 shrink-0"
-                        onClick={() => deleteMatchEvent(g.id)}>
+                        onClick={() => deleteMatchEvent(matchId, g.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -378,7 +396,14 @@ export default function AdminLivePage() {
         <div className="space-y-3">
           <Card>
             <CardHeader className="pb-2"><CardTitle className="text-sm">카드 추가</CardTitle></CardHeader>
-            <CardContent><CardForm /></CardContent>
+            <CardContent>
+              <CardForm
+                matchId={matchId}
+                awayPlayers={awayPlayers}
+                awayTeamFlag={match.awayTeamFlag}
+                awayTeamName={match.awayTeamName}
+              />
+            </CardContent>
           </Card>
 
           {cardEvents.length > 0 && (
@@ -393,11 +418,11 @@ export default function AdminLivePage() {
                   return (
                     <div key={c.id} className="flex items-center gap-2 rounded-lg border p-3">
                       <span className="text-xs text-muted-foreground w-8 shrink-0">{c.time}&apos;</span>
-                      <span>{isKorea ? '🇰🇷' : '🇲🇽'}</span>
+                      <span>{isKorea ? '🇰🇷' : match.awayTeamFlag}</span>
                       <span>{emoji}</span>
                       <span className="flex-1 text-sm">{c.player}</span>
                       <Button variant="ghost" size="icon" className="text-red-500 h-7 w-7 shrink-0"
-                        onClick={() => deleteMatchEvent(c.id)}>
+                        onClick={() => deleteMatchEvent(matchId, c.id)}>
                         <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>

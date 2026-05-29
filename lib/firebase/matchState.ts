@@ -6,18 +6,15 @@ import {
 import { db } from './config';
 import type { MatchStatusShort, GoalEvent, CardEvent } from '@/types/match';
 
-// ── 컬렉션/문서 경로 ──────────────────────────────────────────────────────────
-const matchStateRef = () => doc(db, 'matchState', 'current');
-const matchEventsRef = () => collection(db, 'matchEvents');
+const matchStateRef = (matchId: string) => doc(db, `m${matchId}_matchState`, 'current');
+const matchEventsRef = (matchId: string) => collection(db, `m${matchId}_matchEvents`);
 
-// ── 타입 ─────────────────────────────────────────────────────────────────────
 export interface MatchStateDoc {
   status: MatchStatusShort;
   koreaScore: number;
   mexicoScore: number;
   koreaHalfScore: number | null;
   mexicoHalfScore: number | null;
-  // Set by admin after first half (halftime-input)
   halfTimeResult?: string;
   firstGoalTeam?: string;
   firstGoalTimeRange?: string;
@@ -31,70 +28,55 @@ export type MatchEventDoc = (
   | (CardEvent & { eventKind: 'card' })
 ) & { id: string; createdAt: unknown };
 
-// ── 경기 상태 읽기/쓰기 ───────────────────────────────────────────────────────
-export async function getMatchState(): Promise<MatchStateDoc | null> {
-  const snap = await getDoc(matchStateRef());
+export async function getMatchState(matchId: string): Promise<MatchStateDoc | null> {
+  const snap = await getDoc(matchStateRef(matchId));
   return snap.exists() ? (snap.data() as MatchStateDoc) : null;
 }
 
-export async function initMatchState() {
-  const snap = await getDoc(matchStateRef());
+export async function initMatchState(matchId: string) {
+  const snap = await getDoc(matchStateRef(matchId));
   if (!snap.exists()) {
-    await setDoc(matchStateRef(), {
-      status: 'NS',
-      koreaScore: 0,
-      mexicoScore: 0,
-      koreaHalfScore: null,
-      mexicoHalfScore: null,
+    await setDoc(matchStateRef(matchId), {
+      status: 'NS', koreaScore: 0, mexicoScore: 0,
+      koreaHalfScore: null, mexicoHalfScore: null,
       updatedAt: serverTimestamp(),
     });
   }
 }
 
-export async function updateMatchState(payload: Partial<Omit<MatchStateDoc, 'updatedAt'>>) {
-  await setDoc(matchStateRef(), { ...payload, updatedAt: serverTimestamp() }, { merge: true });
+export async function updateMatchState(matchId: string, payload: Partial<Omit<MatchStateDoc, 'updatedAt'>>) {
+  await setDoc(matchStateRef(matchId), { ...payload, updatedAt: serverTimestamp() }, { merge: true });
 }
 
-// ── 이벤트 CRUD ───────────────────────────────────────────────────────────────
-export async function addGoalEvent(goal: GoalEvent): Promise<string> {
+export async function addGoalEvent(matchId: string, goal: GoalEvent): Promise<string> {
   const { type: goalType, ...rest } = goal;
-  const ref = await addDoc(matchEventsRef(), {
-    eventKind: 'goal',
-    goalType,
-    ...rest,
-    createdAt: serverTimestamp(),
+  const ref = await addDoc(matchEventsRef(matchId), {
+    eventKind: 'goal', goalType, ...rest, createdAt: serverTimestamp(),
   });
   return ref.id;
 }
 
-export async function addCardEvent(card: CardEvent): Promise<string> {
-  const ref = await addDoc(matchEventsRef(), {
-    eventKind: 'card',
-    ...card,
-    createdAt: serverTimestamp(),
+export async function addCardEvent(matchId: string, card: CardEvent): Promise<string> {
+  const ref = await addDoc(matchEventsRef(matchId), {
+    eventKind: 'card', ...card, createdAt: serverTimestamp(),
   });
   return ref.id;
 }
 
-export async function deleteMatchEvent(id: string) {
-  await deleteDoc(doc(db, 'matchEvents', id));
+export async function deleteMatchEvent(matchId: string, id: string) {
+  await deleteDoc(doc(db, `m${matchId}_matchEvents`, id));
 }
 
-// ── 실시간 구독 ───────────────────────────────────────────────────────────────
-export function subscribeMatchState(
-  cb: (state: MatchStateDoc | null) => void
-): Unsubscribe {
-  return onSnapshot(matchStateRef(), (snap) => {
+export function subscribeMatchState(matchId: string, cb: (state: MatchStateDoc | null) => void): Unsubscribe {
+  return onSnapshot(matchStateRef(matchId), (snap) => {
     cb(snap.exists() ? (snap.data() as MatchStateDoc) : null);
   }, () => cb(null));
 }
 
-export function subscribeMatchEvents(
-  cb: (events: MatchEventDoc[]) => void
-): Unsubscribe {
-  const q = query(matchEventsRef(), orderBy('createdAt', 'asc'));
+export function subscribeMatchEvents(matchId: string, cb: (events: MatchEventDoc[]) => void): Unsubscribe {
+  const q = query(matchEventsRef(matchId), orderBy('createdAt', 'asc'));
   return onSnapshot(q, (snap) => {
     const events = snap.docs.map((d) => ({ id: d.id, ...d.data() } as MatchEventDoc));
     cb(events);
-  });
+  }, () => cb([]));
 }

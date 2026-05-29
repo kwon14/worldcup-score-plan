@@ -33,6 +33,20 @@ export const MEXICO_PLAYER_DATA: PlayerData[] = [
   { name: '없음',        position: '-',  club: '-',                nationalGoals: 0,  scoringProb: 7  },
 ];
 
+export const CZECH_PLAYER_DATA: PlayerData[] = [
+  { name: 'P. 시크',      position: 'FW', club: '레버쿠젠',  nationalGoals: 29, scoringProb: 30 },
+  { name: 'A. 흘로젝',    position: 'FW', club: '레버쿠젠',  nationalGoals: 12, scoringProb: 18 },
+  { name: 'J. 페섹',      position: 'FW', club: '미정',      nationalGoals: 8,  scoringProb: 12 },
+  { name: 'A. 바라크',    position: 'MF', club: '미정',      nationalGoals: 8,  scoringProb: 8  },
+  { name: 'T. 수체크',    position: 'MF', club: '웨스트햄',  nationalGoals: 12, scoringProb: 6  },
+  { name: 'J. 얀크토',    position: 'MF', club: '미정',      nationalGoals: 8,  scoringProb: 4  },
+  { name: 'V. 코우팔',    position: 'DF', club: '웨스트햄',  nationalGoals: 1,  scoringProb: 1  },
+  { name: 'L. 크레이치',  position: 'DF', club: '미정',      nationalGoals: 1,  scoringProb: 1  },
+  { name: 'O. 콜라르',    position: 'GK', club: '미정',      nationalGoals: 0,  scoringProb: 0  },
+  { name: '없음',         position: '-',  club: '-',         nationalGoals: 0,  scoringProb: 5  },
+];
+
 // 하위 호환용 — predict 폼 외 곳에서 단순 이름 배열이 필요할 때 사용
 export const KOREA_PLAYERS = KOREA_PLAYER_DATA.map((p) => p.name) as string[];
 export const MEXICO_PLAYERS = MEXICO_PLAYER_DATA.map((p) => p.name) as string[];
+export const CZECH_PLAYERS = CZECH_PLAYER_DATA.map((p) => p.name) as string[];

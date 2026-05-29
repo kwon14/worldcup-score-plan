@@ -4,11 +4,32 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ShieldCheck, Lock } from 'lucide-react';
+import { MatchProvider, useMatch } from '@/contexts/MatchContext';
+import { MATCHES } from '@/constants/matches';
 
 const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? '0619';
 const SESSION_KEY = 'admin_authed';
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+function MatchTabs() {
+  const { matchId, setMatchId } = useMatch();
+  return (
+    <div className="flex gap-1 rounded-lg bg-slate-100 p-1 mx-4 mb-3">
+      {Object.values(MATCHES).map((m) => (
+        <button
+          key={m.id}
+          onClick={() => setMatchId(m.id)}
+          className={`flex-1 rounded py-1.5 text-xs font-semibold transition-colors ${
+            matchId === m.id ? 'bg-white text-korea-red shadow-sm' : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          {m.label} {m.awayTeamFlag}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AdminContent({ children }: { children: React.ReactNode }) {
   const [pin, setPin] = useState('');
   const [authed, setAuthed] = useState(false);
   const [error, setError] = useState(false);
@@ -62,22 +83,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* 어드민 상단 바 */}
-      <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-white px-4 py-3 shadow-sm">
-        <ShieldCheck className="h-5 w-5 text-korea-red" />
-        <span className="font-bold text-sm">운영자 모드</span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="ml-auto text-xs text-muted-foreground"
-          onClick={() => { sessionStorage.removeItem(SESSION_KEY); setAuthed(false); }}
-        >
-          로그아웃
-        </Button>
+      <div className="sticky top-0 z-10 border-b bg-white shadow-sm">
+        <div className="flex items-center gap-2 px-4 py-3">
+          <ShieldCheck className="h-5 w-5 text-korea-red" />
+          <span className="font-bold text-sm">운영자 모드</span>
+          <Button
+            variant="ghost" size="sm"
+            className="ml-auto text-xs text-muted-foreground"
+            onClick={() => { sessionStorage.removeItem(SESSION_KEY); setAuthed(false); }}
+          >
+            로그아웃
+          </Button>
+        </div>
+        <MatchTabs />
       </div>
       <div className="mx-auto max-w-lg px-4 pb-16 pt-4">
         {children}
       </div>
     </div>
+  );
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <MatchProvider>
+      <AdminContent>{children}</AdminContent>
+    </MatchProvider>
   );
 }

@@ -12,7 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Info, Trophy } from 'lucide-react';
 import { FIRST_GOAL_TIME_OPTIONS, FIRST_GOAL_TEAM_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
-import { KOREA_PLAYER_DATA, MEXICO_PLAYER_DATA } from '@/constants/players';
+import { KOREA_PLAYER_DATA } from '@/constants/players';
+import { useMatch } from '@/contexts/MatchContext';
 
 function RadioGroup<T extends string>({
   name, options, value, onChange,
@@ -55,6 +56,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
 
 export default function FinalInputPage() {
   const router = useRouter();
+  const { matchId, match } = useMatch();
 
   const [koreaFinal, setKoreaFinal] = useState('');
   const [mexicoFinal, setMexicoFinal] = useState('');
@@ -69,8 +71,8 @@ export default function FinalInputPage() {
   const [matchStateData, setMatchStateData] = useState<MatchStateDoc | null>(null);
 
   useEffect(() => {
-    getMatchState().then(setMatchStateData);
-  }, []);
+    getMatchState(matchId).then(setMatchStateData);
+  }, [matchId]);
 
   const koreaNum = Number(koreaFinal);
   const mexicoNum = Number(mexicoFinal);
@@ -111,7 +113,7 @@ export default function FinalInputPage() {
         koreaNum > mexicoNum ? 'KOREA_WIN' : koreaNum < mexicoNum ? 'MEXICO_WIN' : 'DRAW';
       const halfTimeResultCode: HalfTimeResult =
         (matchStateData?.halfTimeResult as HalfTimeResult | undefined) ?? 'DRAW';
-      await saveActualResult({
+      await saveActualResult(matchId, {
         matchResult: matchResultCode,
         koreaScore: koreaNum,
         mexicoScore: mexicoNum,
@@ -123,7 +125,7 @@ export default function FinalInputPage() {
         cardRange: cardRange as CardRange,
         officialMvp: mvp,
       });
-      await setGameStatus('AFTER_MATCH');
+      await setGameStatus(matchId, 'AFTER_MATCH');
       router.push('/admin');
     } catch (err) {
       console.error(err);
@@ -156,7 +158,7 @@ export default function FinalInputPage() {
           </div>
           <span className="text-2xl font-bold text-muted-foreground pt-5">:</span>
           <div className="flex-1 text-center">
-            <label className="block text-xs text-muted-foreground mb-1">🇲🇽 멕시코</label>
+            <label className="block text-xs text-muted-foreground mb-1">{match.awayTeamFlag} {match.awayTeamName}</label>
             <input
               type="number" min="0" max="20" value={mexicoFinal}
               onChange={(e) => setMexicoFinal(e.target.value)}
@@ -206,15 +208,15 @@ export default function FinalInputPage() {
         </select>
       </SectionCard>
 
-      {/* 멕시코 첫 득점자 */}
-      <SectionCard title="🇲🇽 멕시코 첫 득점자">
+      {/* 어웨이팀 첫 득점자 */}
+      <SectionCard title={`${match.awayTeamFlag} ${match.awayTeamName} 첫 득점자`}>
         <select
           value={mexicoFirstScorer}
           onChange={(e) => setMexicoFirstScorer(e.target.value)}
           className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
         >
           <option value="">선택하세요</option>
-          {MEXICO_PLAYER_DATA.map((p) => (
+          {match.awayPlayerData.map((p) => (
             <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
           ))}
         </select>
@@ -247,8 +249,8 @@ export default function FinalInputPage() {
               <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
             ))}
           </optgroup>
-          <optgroup label="🇲🇽 멕시코">
-            {MEXICO_PLAYER_DATA.filter((p) => p.name !== '없음').map((p) => (
+          <optgroup label={`${match.awayTeamFlag} ${match.awayTeamName}`}>
+            {match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => (
               <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
             ))}
           </optgroup>
@@ -262,9 +264,9 @@ export default function FinalInputPage() {
             <Info className="h-4 w-4 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <p className="font-semibold">저장 전 최종 확인</p>
-              <p>🏆 최종 스코어: 대한민국 {koreaFinal} : {mexicoFinal} 멕시코</p>
-              <p>⚽ 첫 골: {firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : firstGoalTeam === 'MEXICO' ? '🇲🇽 멕시코' : '없음'} {firstGoalTime && `· ${FIRST_GOAL_TIME_LABEL[firstGoalTime]}`}</p>
-              <p>🇰🇷 한국 첫 득점자: {koreaFirstScorer} · 🇲🇽 멕시코: {mexicoFirstScorer}</p>
+              <p>🏆 최종 스코어: 대한민국 {koreaFinal} : {mexicoFinal} {match.awayTeamName}</p>
+              <p>⚽ 첫 골: {firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : firstGoalTeam === 'MEXICO' ? `${match.awayTeamFlag} ${match.awayTeamName}` : '없음'} {firstGoalTime && `· ${FIRST_GOAL_TIME_LABEL[firstGoalTime]}`}</p>
+              <p>🇰🇷 한국 첫 득점자: {koreaFirstScorer} · {match.awayTeamFlag} {match.awayTeamName}: {mexicoFirstScorer}</p>
               <p>🟨 카드: {CARD_RANGE_LABEL[cardRange]} · 🏅 MVP: {mvp}</p>
               <p className="font-semibold text-red-700 mt-1">저장하면 전체 점수가 자동 계산됩니다.</p>
             </div>

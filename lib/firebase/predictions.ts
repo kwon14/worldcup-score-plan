@@ -20,21 +20,20 @@ export interface PredictionDoc {
   cardRange: string;
   mvp: string;
   comment: string;
-  // 하프타임 수정
   halftimeRevised?: boolean;
-  // MVP 최종 제출
   finalMvp?: string;
   createdAt: unknown;
   updatedAt: unknown;
 }
 
-const predictionsRef = () => collection(db, 'predictions');
+const predictionsRef = (matchId: string) => collection(db, `m${matchId}_predictions`);
 
 export async function savePrediction(
+  matchId: string,
   participantId: string,
   data: Omit<PredictionDoc, 'participantId' | 'createdAt' | 'updatedAt'>
 ) {
-  const ref = doc(predictionsRef(), participantId);
+  const ref = doc(predictionsRef(matchId), participantId);
   const existing = await getDoc(ref);
   await setDoc(ref, {
     ...data,
@@ -44,18 +43,18 @@ export async function savePrediction(
   });
 }
 
-export async function getPrediction(participantId: string): Promise<PredictionDoc | null> {
-  const snap = await getDoc(doc(predictionsRef(), participantId));
+export async function getPrediction(matchId: string, participantId: string): Promise<PredictionDoc | null> {
+  const snap = await getDoc(doc(predictionsRef(matchId), participantId));
   return snap.exists() ? (snap.data() as PredictionDoc) : null;
 }
 
-export async function getAllPredictions(): Promise<PredictionDoc[]> {
-  const snap = await getDocs(query(predictionsRef(), orderBy('createdAt', 'asc')));
+export async function getAllPredictions(matchId: string): Promise<PredictionDoc[]> {
+  const snap = await getDocs(query(predictionsRef(matchId), orderBy('createdAt', 'asc')));
   return snap.docs.map((d) => d.data() as PredictionDoc);
 }
 
-export function subscribePredictions(cb: (list: PredictionDoc[]) => void): Unsubscribe {
-  return onSnapshot(query(predictionsRef(), orderBy('createdAt', 'asc')), (snap) => {
+export function subscribePredictions(matchId: string, cb: (list: PredictionDoc[]) => void): Unsubscribe {
+  return onSnapshot(query(predictionsRef(matchId), orderBy('createdAt', 'asc')), (snap) => {
     cb(snap.docs.map((d) => d.data() as PredictionDoc));
   }, () => cb([]));
 }

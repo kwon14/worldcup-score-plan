@@ -8,11 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Lock, CheckCircle2, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { MATCH_RESULT_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
-import { KOREA_PLAYER_DATA, MEXICO_PLAYER_DATA, type PlayerData } from '@/constants/players';
+import { KOREA_PLAYER_DATA, type PlayerData } from '@/constants/players';
 import { SCORE_WEIGHTS, GOAL_TIME_ORDER } from '@/constants/gameConfig';
 import { LiveMatchPanel } from '@/components/game/LiveMatchPanel';
 import { subscribeMatchState, type MatchStateDoc } from '@/lib/firebase/matchState';
 import { subscribePredictions, getPrediction, savePrediction, type PredictionDoc } from '@/lib/firebase/predictions';
+import { useMatch } from '@/contexts/MatchContext';
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
 
@@ -176,6 +177,7 @@ function PlayerSelector({
 
 export default function HalfTimePage() {
   const router = useRouter();
+  const { matchId, match } = useMatch();
 
   const [loading, setLoading] = useState(true);
   const [participantId, setParticipantId] = useState<string | null>(null);
@@ -192,10 +194,10 @@ export default function HalfTimePage() {
   const [mexicoFirstScorer, setMexicoFirstScorer] = useState('');
 
   useEffect(() => {
-    const id = typeof window !== 'undefined' ? localStorage.getItem('wc_participant_id') : null;
+    const id = typeof window !== 'undefined' ? localStorage.getItem(`wc_participant_id_${matchId}`) : null;
     setParticipantId(id);
     if (id) {
-      getPrediction(id).then((pred) => {
+      getPrediction(matchId, id).then((pred) => {
         if (pred) {
           setMyPrediction(pred);
           setMatchResult(pred.matchResult);
@@ -210,10 +212,10 @@ export default function HalfTimePage() {
     } else {
       setLoading(false);
     }
-  }, []);
+  }, [matchId]);
 
-  useEffect(() => subscribeMatchState(setMatchState), []);
-  useEffect(() => subscribePredictions(setAllPredictions), []);
+  useEffect(() => subscribeMatchState(matchId, setMatchState), [matchId]);
+  useEffect(() => subscribePredictions(matchId, setAllPredictions), [matchId]);
 
   const firstGoalTeam = matchState?.firstGoalTeam ?? 'NONE';
   const firstGoalOccurred = firstGoalTeam !== 'NONE';
@@ -238,7 +240,7 @@ export default function HalfTimePage() {
     if (!myPrediction || !participantId) return;
     setSubmitting(true);
     try {
-      await savePrediction(participantId, {
+      await savePrediction(matchId, participantId, {
         name: myPrediction.name,
         team: myPrediction.team,
         matchResult,
@@ -328,7 +330,7 @@ export default function HalfTimePage() {
         </div>
       </div>
 
-      <LiveMatchPanel compact />
+      <LiveMatchPanel matchId={matchId} compact />
 
       {/* 전반 실제 결과 */}
       {matchState?.koreaHalfScore !== null && matchState?.koreaHalfScore !== undefined && (
@@ -489,7 +491,7 @@ export default function HalfTimePage() {
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel
-            title="🇲🇽 멕시코 첫 득점자"
+            title={`${match.awayTeamFlag} ${match.awayTeamName} 첫 득점자`}
             points={SCORE_WEIGHTS.koreaFirstScorer}
             locked={mexicoFirstScorerLocked}
           />
@@ -502,7 +504,7 @@ export default function HalfTimePage() {
             ? <LockedOverlay reason={`전반 첫 득점자 확정: ${matchState?.mexicoFirstScorer}`} />
             : <PlayerSelector
                 name="mexicoFirstScorer"
-                players={MEXICO_PLAYER_DATA}
+                players={match.awayPlayerData}
                 value={mexicoFirstScorer}
                 onChange={setMexicoFirstScorer}
                 accentColor="green-600"

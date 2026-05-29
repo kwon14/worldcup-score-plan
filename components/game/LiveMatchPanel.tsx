@@ -7,6 +7,8 @@ import { Wifi, WifiOff } from 'lucide-react';
 import { subscribeMatchState, subscribeMatchEvents } from '@/lib/firebase/matchState';
 import type { MatchStateDoc, MatchEventDoc } from '@/lib/firebase/matchState';
 import type { GoalEvent, CardEvent, MatchStatusShort } from '@/types/match';
+import { useMatch } from '@/contexts/MatchContext';
+import type { MatchConfig } from '@/constants/matches';
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
 const LIVE_STATUSES: MatchStatusShort[] = ['1H', 'HT', '2H', 'ET', 'P', 'BT', 'LIVE'];
@@ -65,18 +67,23 @@ function CardRow({ card }: { card: CardEvent & { id: string } }) {
 function ScoreBanner({
   state,
   goals,
+  match,
 }: {
   state: MatchStateDoc;
   goals: (GoalEvent & { id: string })[];
+  match: MatchConfig;
 }) {
   const short = state.status;
   const isLive = LIVE_STATUSES.includes(short);
+  const showScore = SHOW_DATA_STATUSES.includes(short);
 
   const koreaGoals = goals.filter((g) => g.teamName.toLowerCase().includes('korea')).length;
-  const mexicoGoals = goals.filter((g) => !g.teamName.toLowerCase().includes('korea')).length;
+  const awayGoals = goals.filter((g) => !g.teamName.toLowerCase().includes('korea')).length;
 
   return (
-    <div className="rounded-xl bg-gradient-to-r from-korea-blue to-korea-red p-5 text-white text-center space-y-2">
+    <div className="rounded-xl bg-gradient-to-r from-korea-blue to-korea-red p-5 text-white text-center space-y-3">
+      <p className="text-xs font-medium uppercase tracking-widest opacity-70">2026 FIFA 월드컵</p>
+
       <Badge
         variant="secondary"
         className={`text-xs font-semibold px-2 py-0.5 ${isLive ? 'bg-red-500 text-white animate-pulse' : 'bg-white/20 text-white'}`}
@@ -86,11 +93,11 @@ function ScoreBanner({
 
       <div className="flex items-center justify-center gap-6">
         <div className="flex flex-col items-center gap-1">
-          <span className="text-3xl">🇰🇷</span>
-          <span className="text-xs font-semibold opacity-80">대한민국</span>
+          <span className="text-4xl">🇰🇷</span>
+          <span className="text-sm font-semibold">대한민국</span>
         </div>
         <div className="flex flex-col items-center">
-          {SHOW_DATA_STATUSES.includes(short) ? (
+          {showScore ? (
             <>
               <span className="text-4xl font-bold tracking-widest">
                 {state.koreaScore} : {state.mexicoScore}
@@ -102,52 +109,60 @@ function ScoreBanner({
               )}
             </>
           ) : (
-            <span className="text-2xl font-bold opacity-50">VS</span>
+            <span className="text-2xl font-bold opacity-60">VS</span>
           )}
         </div>
         <div className="flex flex-col items-center gap-1">
-          <span className="text-3xl">🇲🇽</span>
-          <span className="text-xs font-semibold opacity-80">멕시코</span>
+          <span className="text-4xl">{match.awayTeamFlag}</span>
+          <span className="text-sm font-semibold">{match.awayTeamName}</span>
         </div>
       </div>
 
-      {SHOW_DATA_STATUSES.includes(short) && (
+      {showScore && (
         <div className="flex justify-center gap-6 text-xs opacity-70">
           <span>한국 {koreaGoals}골</span>
           <span>·</span>
-          <span>멕시코 {mexicoGoals}골</span>
+          <span>{match.awayTeamName} {awayGoals}골</span>
         </div>
       )}
+
+      <div className="flex items-center justify-center gap-3 text-xs opacity-60 pt-1">
+        <span>📅 {match.date}</span>
+        <span>·</span>
+        <span>📍 {match.venue || '장소 미정'}</span>
+      </div>
     </div>
   );
 }
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────────
 interface LiveMatchPanelProps {
-  showLineup?: boolean;
+  matchId: string;
   compact?: boolean;
 }
 
-export function LiveMatchPanel({ compact = false }: LiveMatchPanelProps) {
+export function LiveMatchPanel({ matchId, compact = false }: LiveMatchPanelProps) {
+  const { match } = useMatch();
   const [matchState, setMatchState] = useState<MatchStateDoc | null>(null);
   const [events, setEvents] = useState<MatchEventDoc[]>([]);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const unsubState = subscribeMatchState((s) => {
+    setConnected(false);
+    setMatchState(null);
+    setEvents([]);
+    const unsubState = subscribeMatchState(matchId, (s) => {
       setMatchState(s);
       setConnected(true);
     });
-
-    const unsubEvents = subscribeMatchEvents((evs) => {
+    const unsubEvents = subscribeMatchEvents(matchId, (evs) => {
       setEvents(evs);
     });
-
     return () => {
       unsubState();
       unsubEvents();
     };
-  }, []);
+  }, [matchId]);
 
   // 이벤트 분리
   const goalEvents = events
@@ -174,8 +189,8 @@ export function LiveMatchPanel({ compact = false }: LiveMatchPanelProps) {
       cardType: e.cardType,
     }));
 
-  // 로딩
-  if (!connected || !matchState) {
+  // 로딩 (아직 Firebase 응답 전)
+  if (!connected) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
@@ -186,7 +201,13 @@ export function LiveMatchPanel({ compact = false }: LiveMatchPanelProps) {
     );
   }
 
-  const short = matchState.status;
+  const DEFAULT_STATE: MatchStateDoc = {
+    status: 'NS', koreaScore: 0, mexicoScore: 0,
+    koreaHalfScore: null, mexicoHalfScore: null, updatedAt: null,
+  };
+  const state = matchState ?? DEFAULT_STATE;
+
+  const short = state.status;
   const showData = SHOW_DATA_STATUSES.includes(short);
   const isLive = LIVE_STATUSES.includes(short);
 
@@ -196,7 +217,7 @@ export function LiveMatchPanel({ compact = false }: LiveMatchPanelProps) {
   return (
     <div className="space-y-3">
       {/* 스코어 배너 */}
-      <ScoreBanner state={matchState} goals={goalEvents} />
+      <ScoreBanner state={state} goals={goalEvents} match={match} />
 
       {/* 연결 상태 */}
       <div className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground">

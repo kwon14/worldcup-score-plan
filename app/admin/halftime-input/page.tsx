@@ -10,7 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Info } from 'lucide-react';
 import { FIRST_GOAL_TIME_OPTIONS, FIRST_GOAL_TEAM_OPTIONS } from '@/constants/options';
-import { KOREA_PLAYER_DATA, MEXICO_PLAYER_DATA } from '@/constants/players';
+import { KOREA_PLAYER_DATA } from '@/constants/players';
+import { useMatch } from '@/contexts/MatchContext';
 
 type FirstGoalTeam = 'KOREA' | 'MEXICO' | 'NONE';
 
@@ -77,6 +78,7 @@ function SectionCard({ title, badge, children }: { title: string; badge?: string
 
 export default function HalftimeInputPage() {
   const router = useRouter();
+  const { matchId, match } = useMatch();
 
   const [koreaHalf, setKoreaHalf] = useState('');
   const [mexicoHalf, setMexicoHalf] = useState('');
@@ -118,7 +120,7 @@ export default function HalftimeInputPage() {
     setSubmitting(true);
     try {
       const halfResult = koreaNum > mexicoNum ? 'KOREA_LEAD' : koreaNum < mexicoNum ? 'MEXICO_LEAD' : 'DRAW';
-      await updateMatchState({
+      await updateMatchState(matchId, {
         koreaHalfScore: koreaNum,
         mexicoHalfScore: mexicoNum,
         halfTimeResult: halfResult,
@@ -127,7 +129,7 @@ export default function HalftimeInputPage() {
         koreaFirstScorer: koreaScored ? koreaFirstScorer : '없음',
         mexicoFirstScorer: mexicoScored ? mexicoFirstScorer : '없음',
       });
-      await setGameStatus('HALF_TIME');
+      await setGameStatus(matchId, 'HALF_TIME');
       router.push('/admin');
     } catch (err) {
       console.error(err);
@@ -210,7 +212,7 @@ export default function HalftimeInputPage() {
             className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
           >
             <option value="">선택하세요</option>
-            {MEXICO_PLAYER_DATA.filter((p) => p.name !== '없음').map((p) => (
+            {match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => (
               <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
             ))}
           </select>

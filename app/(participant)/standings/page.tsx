@@ -11,6 +11,7 @@ import { subscribeGameStatus } from '@/lib/firebase/gameStatus';
 import { subscribePredictions, type PredictionDoc } from '@/lib/firebase/predictions';
 import { subscribeMatchState, type MatchStateDoc } from '@/lib/firebase/matchState';
 import { GOAL_TIME_ORDER } from '@/constants/gameConfig';
+import { useMatch } from '@/contexts/MatchContext';
 import type { GameStatus } from '@/types/game';
 
 // ─── 통계 계산 ────────────────────────────────────────────────────────────────
@@ -155,19 +156,21 @@ function HitCard({ label, correct, total }: { label: string; correct: number; to
 // ─── 페이지 ───────────────────────────────────────────────────────────────────
 
 export default function StandingsPage() {
+  const { matchId, match } = useMatch();
   const [gameStatus, setGameStatus] = useState<GameStatus>('BEFORE_MATCH');
   const [predictions, setPredictions] = useState<PredictionDoc[]>([]);
   const [matchState, setMatchState] = useState<MatchStateDoc | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     let count = 0;
     const done = () => { if (++count >= 2) setLoading(false); };
-    const unsubStatus = subscribeGameStatus((s) => { setGameStatus(s); done(); });
-    const unsubPreds = subscribePredictions((list) => { setPredictions(list); done(); });
-    const unsubState = subscribeMatchState(setMatchState);
+    const unsubStatus = subscribeGameStatus(matchId, (s) => { setGameStatus(s); done(); });
+    const unsubPreds = subscribePredictions(matchId, (list) => { setPredictions(list); done(); });
+    const unsubState = subscribeMatchState(matchId, setMatchState);
     return () => { unsubStatus(); unsubPreds(); unsubState(); };
-  }, []);
+  }, [matchId]);
 
   const s = computeStats(predictions);
   const isHalfTime = gameStatus === 'HALF_TIME';
@@ -236,7 +239,7 @@ export default function StandingsPage() {
             <div className="space-y-3">
               <RatioBar label="🇰🇷 대한민국 승" count={s.matchResult.KOREA_WIN} total={s.total} color="bg-korea-red" />
               <RatioBar label="🤝 무승부" count={s.matchResult.DRAW} total={s.total} color="bg-slate-400" />
-              <RatioBar label="🇲🇽 멕시코 승" count={s.matchResult.MEXICO_WIN} total={s.total} color="bg-green-600" />
+              <RatioBar label={`${match.awayTeamFlag} ${match.awayTeamName} 승`} count={s.matchResult.MEXICO_WIN} total={s.total} color="bg-green-600" />
             </div>
           </SectionCard>
 
@@ -245,7 +248,7 @@ export default function StandingsPage() {
             <div className="space-y-3">
               <RatioBar label="🇰🇷 대한민국 리드" count={s.halfTimeResult.KOREA_LEAD} total={s.total} color="bg-korea-red" />
               <RatioBar label="🤝 무승부" count={s.halfTimeResult.DRAW} total={s.total} color="bg-slate-400" />
-              <RatioBar label="🇲🇽 멕시코 리드" count={s.halfTimeResult.MEXICO_LEAD} total={s.total} color="bg-green-600" />
+              <RatioBar label={`${match.awayTeamFlag} ${match.awayTeamName} 리드`} count={s.halfTimeResult.MEXICO_LEAD} total={s.total} color="bg-green-600" />
             </div>
           </SectionCard>
 
@@ -276,7 +279,7 @@ export default function StandingsPage() {
           <SectionCard title="🥅 첫 골 팀 예측">
             <div className="space-y-3">
               <RatioBar label="🇰🇷 대한민국" count={s.firstGoalTeam.KOREA} total={s.total} color="bg-korea-red" />
-              <RatioBar label="🇲🇽 멕시코" count={s.firstGoalTeam.MEXICO} total={s.total} color="bg-green-600" />
+              <RatioBar label={`${match.awayTeamFlag} ${match.awayTeamName}`} count={s.firstGoalTeam.MEXICO} total={s.total} color="bg-green-600" />
               <RatioBar label="없음 (무득점)" count={s.firstGoalTeam.NONE} total={s.total} color="bg-slate-400" />
             </div>
           </SectionCard>
@@ -295,8 +298,8 @@ export default function StandingsPage() {
             <TopList items={s.koreaFirstScorer} total={s.total} />
           </SectionCard>
 
-          {/* 멕시코 첫 득점자 TOP */}
-          <SectionCard title="🇲🇽 멕시코 첫 득점자 TOP">
+          {/* 상대팀 첫 득점자 TOP */}
+          <SectionCard title={`${match.awayTeamFlag} ${match.awayTeamName} 첫 득점자 TOP`}>
             <TopList items={s.mexicoFirstScorer} total={s.total} />
           </SectionCard>
         </>

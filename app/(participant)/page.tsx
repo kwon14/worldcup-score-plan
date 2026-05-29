@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { MatchInfo } from '@/components/game/MatchInfo';
 import { GameStatusBanner } from '@/components/game/GameStatusBanner';
 import { WorldCupInfo } from '@/components/game/WorldCupInfo';
 import { LiveMatchPanel } from '@/components/game/LiveMatchPanel';
 import { Users, Trophy, Clock } from 'lucide-react';
 import { subscribeGameStatus } from '@/lib/firebase/gameStatus';
 import { subscribePredictions } from '@/lib/firebase/predictions';
+import { useMatch } from '@/contexts/MatchContext';
 import type { GameStatus } from '@/types/game';
 
 const DEADLINE_LABEL: Partial<Record<GameStatus, string>> = {
@@ -23,16 +23,16 @@ const DEADLINE_LABEL: Partial<Record<GameStatus, string>> = {
 };
 
 export default function HomePage() {
+  const { matchId } = useMatch();
   const [gameStatus, setGameStatus] = useState<GameStatus>('BEFORE_MATCH');
   const [participantCount, setParticipantCount] = useState(0);
 
   useEffect(() => {
-    const unsubStatus = subscribeGameStatus(setGameStatus);
-    const unsubPreds = subscribePredictions((list) => setParticipantCount(list.length));
+    const unsubStatus = subscribeGameStatus(matchId, setGameStatus);
+    const unsubPreds = subscribePredictions(matchId, (list) => setParticipantCount(list.length));
     return () => { unsubStatus(); unsubPreds(); };
-  }, []);
+  }, [matchId]);
 
-  // 게임 상태별 CTA 버튼
   const ctaButton = (() => {
     switch (gameStatus) {
       case 'BEFORE_MATCH':
@@ -60,19 +60,10 @@ export default function HomePage() {
 
   return (
     <div className="space-y-4">
-      {/* 게임 상태 */}
       <GameStatusBanner status={gameStatus} />
-
-      {/* 경기 정보 */}
-      <MatchInfo />
-
-      {/* 실시간 경기 데이터 */}
-      <LiveMatchPanel />
-
-      {/* 월드컵 & 팀 정보 */}
+      <LiveMatchPanel matchId={matchId} />
       <WorldCupInfo />
 
-      {/* 통계 카드 */}
       <div className="grid grid-cols-3 gap-3">
         <Card>
           <CardContent className="flex flex-col items-center gap-1 p-4">
@@ -99,7 +90,6 @@ export default function HomePage() {
         </Card>
       </div>
 
-      {/* 안내 문구 */}
       <Card>
         <CardContent className="p-4 text-sm text-muted-foreground space-y-1">
           <p>⚽ 경기 결과, 스코어, 첫 득점자 등을 예측해보세요.</p>
@@ -108,11 +98,12 @@ export default function HomePage() {
         </CardContent>
       </Card>
 
-      {/* 상태별 CTA */}
       {ctaButton}
 
-      {/* 보조 링크 */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
+        <Button variant="outline" asChild>
+          <Link href="/my-prediction">내 예측 확인</Link>
+        </Button>
         <Button variant="outline" asChild>
           <Link href="/standings">예측 현황</Link>
         </Button>

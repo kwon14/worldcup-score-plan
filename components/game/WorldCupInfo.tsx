@@ -1,4 +1,7 @@
+'use client';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMatch } from '@/contexts/MatchContext';
 
 const GROUP_A_TEAMS = [
   { flag: '🇲🇽', name: '멕시코', extra: '개최국' },
@@ -13,49 +16,31 @@ const KOREA_INFO = {
   rank: 'FIFA 26위',
   coach: '홍명보',
   keyPlayers: ['손흥민 (LA FC)', '김민재 (바이에른)', '이강인 (PSG)'],
-  style: 'border-t-4 border-t-korea-red',
-  accent: 'text-korea-red',
-  bg: 'bg-red-50',
+  borderClass: 'border-t-korea-red',
+  accentClass: 'text-korea-red',
+  bgClass: 'bg-red-50',
 };
 
-const MEXICO_INFO = {
-  flag: '🇲🇽',
-  name: '멕시코',
-  rank: '개최국 · FIFA 15위',
-  coach: 'J.M. 세라노',
-  keyPlayers: ['H.로사노', 'S.히메네스', 'A.비달'],
-  style: 'border-t-4 border-t-green-600',
-  accent: 'text-green-700',
-  bg: 'bg-green-50',
-};
-
-// 역대 전적: 15전 멕시코 9승 3무 한국 3승 (월드컵: 멕시코 2승)
-const HH = {
-  total: 15,
-  koreaWin: 3,
-  draw: 3,
-  mexicoWin: 9,
-  wcKoreaWin: 0,
-  wcDraw: 0,
-  wcMexicoWin: 2,
-  lastMeeting: '2025년 · 2-2 무승부',
-};
-
-function TeamCard({ team }: { team: typeof KOREA_INFO }) {
+function TeamCard({
+  flag, name, rank, coach, keyPlayers, borderClass, accentClass, bgClass,
+}: {
+  flag: string; name: string; rank: string; coach: string;
+  keyPlayers: string[]; borderClass: string; accentClass: string; bgClass: string;
+}) {
   return (
-    <div className={`rounded-xl border bg-white ${team.style} p-4 flex-1`}>
+    <div className={`rounded-xl border bg-white border-t-4 ${borderClass} p-4 flex-1`}>
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-2xl">{team.flag}</span>
+        <span className="text-2xl">{flag}</span>
         <div>
-          <p className="font-bold text-sm">{team.name}</p>
-          <p className={`text-xs font-medium ${team.accent}`}>{team.rank}</p>
+          <p className="font-bold text-sm">{name}</p>
+          <p className={`text-xs font-medium ${accentClass}`}>{rank}</p>
         </div>
       </div>
-      <div className={`rounded-lg ${team.bg} px-3 py-2 space-y-1`}>
+      <div className={`rounded-lg ${bgClass} px-3 py-2 space-y-1`}>
         <p className="text-xs text-muted-foreground">
-          감독 <span className="font-semibold text-foreground">{team.coach}</span>
+          감독 <span className="font-semibold text-foreground">{coach}</span>
         </p>
-        {team.keyPlayers.map((p) => (
+        {keyPlayers.map((p) => (
           <p key={p} className="text-xs text-muted-foreground">⚽ {p}</p>
         ))}
       </div>
@@ -64,6 +49,10 @@ function TeamCard({ team }: { team: typeof KOREA_INFO }) {
 }
 
 export function WorldCupInfo() {
+  const { match } = useMatch();
+  const hh = match.headToHead;
+  const away = match.awayTeamInfo;
+
   return (
     <div className="space-y-3">
       {/* A조 구성 */}
@@ -96,8 +85,17 @@ export function WorldCupInfo() {
           <CardTitle className="text-sm">팀 소개</CardTitle>
         </CardHeader>
         <CardContent className="flex gap-3">
-          <TeamCard team={KOREA_INFO} />
-          <TeamCard team={MEXICO_INFO} />
+          <TeamCard {...KOREA_INFO} />
+          <TeamCard
+            flag={match.awayTeamFlag}
+            name={match.awayTeamName}
+            rank={away.rank}
+            coach={away.coach}
+            keyPlayers={away.keyPlayers}
+            borderClass={away.borderClass}
+            accentClass={away.accentClass}
+            bgClass={away.bgClass}
+          />
         </CardContent>
       </Card>
 
@@ -109,47 +107,55 @@ export function WorldCupInfo() {
         <CardContent className="space-y-3">
           {/* 전체 */}
           <div>
-            <p className="text-xs text-muted-foreground mb-1.5">전체 ({HH.total}전)</p>
+            <p className="text-xs text-muted-foreground mb-1.5">전체 ({hh.total}전)</p>
             <div className="flex rounded-lg overflow-hidden text-xs font-semibold text-center">
-              <div
-                className="bg-korea-red text-white py-1.5"
-                style={{ flex: HH.koreaWin }}
-              >
-                한국 {HH.koreaWin}승
+              <div className="bg-korea-red text-white py-1.5" style={{ flex: hh.koreaWin }}>
+                한국 {hh.koreaWin}승
+              </div>
+              <div className="bg-slate-300 text-slate-700 py-1.5" style={{ flex: hh.draw }}>
+                {hh.draw}무
               </div>
               <div
-                className="bg-slate-300 text-slate-700 py-1.5"
-                style={{ flex: HH.draw }}
+                className={`text-white py-1.5 ${away.bgClass.replace('bg-', 'bg-').replace('-50', '-600') === away.bgClass ? 'bg-slate-500' : ''}`}
+                style={{
+                  flex: hh.awayWin,
+                  backgroundColor: away.borderClass.includes('green') ? '#16a34a' : away.borderClass.includes('blue') ? '#2563eb' : '#6b7280',
+                }}
               >
-                {HH.draw}무
-              </div>
-              <div
-                className="bg-green-600 text-white py-1.5"
-                style={{ flex: HH.mexicoWin }}
-              >
-                멕시코 {HH.mexicoWin}승
+                {match.awayTeamName} {hh.awayWin}승
               </div>
             </div>
           </div>
 
-          {/* 월드컵 한정 */}
-          <div>
-            <p className="text-xs text-muted-foreground mb-1.5">월드컵 한정 (2전)</p>
-            <div className="flex rounded-lg overflow-hidden text-xs font-semibold text-center">
-              <div className="bg-slate-200 text-slate-500 py-1.5 flex-1">
-                한국 {HH.wcKoreaWin}승
+          {/* 월드컵 한정 (데이터 있을 때만) */}
+          {hh.wcTotal !== undefined && hh.wcTotal > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1.5">월드컵 한정 ({hh.wcTotal}전)</p>
+              <div className="flex rounded-lg overflow-hidden text-xs font-semibold text-center">
+                <div className={`py-1.5 flex-1 ${(hh.wcKoreaWin ?? 0) > 0 ? 'bg-korea-red text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  한국 {hh.wcKoreaWin ?? 0}승
+                </div>
+                <div className="bg-slate-200 text-slate-500 py-1.5 flex-1">
+                  {hh.wcDraw ?? 0}무
+                </div>
+                <div
+                  className="text-white py-1.5 flex-[2]"
+                  style={{
+                    backgroundColor: away.borderClass.includes('green') ? '#16a34a' : away.borderClass.includes('blue') ? '#2563eb' : '#6b7280',
+                  }}
+                >
+                  {match.awayTeamName} {hh.wcAwayWin ?? 0}승
+                </div>
               </div>
-              <div className="bg-slate-200 text-slate-500 py-1.5 flex-1">
-                {HH.wcDraw}무
-              </div>
-              <div className="bg-green-600 text-white py-1.5 flex-[2]">
-                멕시코 {HH.wcMexicoWin}승
-              </div>
+              {hh.wcNote && (
+                <p className="text-xs text-muted-foreground mt-1">{hh.wcNote} · 최근 대결: {hh.lastMeeting}</p>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              1998 프랑스 3-1, 2018 러시아 2-1 · 최근 대결: {HH.lastMeeting}
-            </p>
-          </div>
+          )}
+
+          {(!hh.wcTotal || hh.wcTotal === 0) && (
+            <p className="text-xs text-muted-foreground">최근 대결: {hh.lastMeeting}</p>
+          )}
         </CardContent>
       </Card>
 
@@ -159,9 +165,9 @@ export function WorldCupInfo() {
           <div className="flex items-start gap-3">
             <div className="text-2xl">📍</div>
             <div className="space-y-0.5">
-              <p className="font-semibold text-sm">에스타디오 아크론, 과달라하라</p>
-              <p className="text-xs text-muted-foreground">현지: 6월 18일 21:00 (CDT)</p>
-              <p className="text-xs font-medium text-korea-red">한국: 6월 19일 11:00 (KST)</p>
+              <p className="font-semibold text-sm">{match.venue || '장소 미정'}</p>
+              <p className="text-xs text-muted-foreground">{match.localDate}</p>
+              <p className="text-xs font-medium text-korea-red">{match.date}</p>
               <p className="text-xs text-muted-foreground mt-1">
                 📺 SBS · MBC · KBS 생중계 예정
               </p>

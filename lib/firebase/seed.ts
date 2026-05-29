@@ -107,8 +107,8 @@ const SAMPLE_PREDICTIONS = [
   },
 ];
 
-export async function seedSampleData(): Promise<void> {
-  const predsRef = collection(db, 'predictions');
+export async function seedSampleData(matchId: string): Promise<void> {
+  const predsRef = collection(db, `m${matchId}_predictions`);
   await Promise.all(
     SAMPLE_PREDICTIONS.map((p) =>
       setDoc(doc(predsRef, p.participantId), {
@@ -119,26 +119,31 @@ export async function seedSampleData(): Promise<void> {
     ),
   );
 
-  await setDoc(doc(db, 'gameStatus', 'current'), {
+  await setDoc(doc(db, `m${matchId}_gameStatus`, 'current'), {
     status: 'BEFORE_MATCH',
+    updatedAt: serverTimestamp(),
+  });
+
+  await setDoc(doc(db, `m${matchId}_matchState`, 'current'), {
+    status: 'NS',
+    koreaScore: 0,
+    mexicoScore: 0,
+    koreaHalfScore: null,
+    mexicoHalfScore: null,
     updatedAt: serverTimestamp(),
   });
 }
 
-export async function resetAllData(): Promise<void> {
-  // 예측 전체 삭제
-  const predSnap = await getDocs(collection(db, 'predictions'));
+export async function resetAllData(matchId: string): Promise<void> {
+  const predSnap = await getDocs(collection(db, `m${matchId}_predictions`));
   await Promise.all(predSnap.docs.map((d) => deleteDoc(d.ref)));
 
-  // 이벤트 전체 삭제
-  const eventSnap = await getDocs(collection(db, 'matchEvents'));
+  const eventSnap = await getDocs(collection(db, `m${matchId}_matchEvents`));
   await Promise.all(eventSnap.docs.map((d) => deleteDoc(d.ref)));
 
-  // 최종 결과 삭제
-  await deleteDoc(doc(db, 'actualResult', 'current'));
+  await deleteDoc(doc(db, `m${matchId}_actualResult`, 'current'));
 
-  // matchState 초기화
-  await setDoc(doc(db, 'matchState', 'current'), {
+  await setDoc(doc(db, `m${matchId}_matchState`, 'current'), {
     status: 'NS',
     koreaScore: 0,
     mexicoScore: 0,
@@ -147,8 +152,7 @@ export async function resetAllData(): Promise<void> {
     updatedAt: serverTimestamp(),
   });
 
-  // gameStatus 초기화
-  await setDoc(doc(db, 'gameStatus', 'current'), {
+  await setDoc(doc(db, `m${matchId}_gameStatus`, 'current'), {
     status: 'BEFORE_MATCH',
     updatedAt: serverTimestamp(),
   });

@@ -11,6 +11,7 @@ import { GAME_STATUS_LABELS } from '@/lib/game/gameState';
 import { subscribeGameStatus, setGameStatus } from '@/lib/firebase/gameStatus';
 import { subscribePredictions, type PredictionDoc } from '@/lib/firebase/predictions';
 import { seedSampleData, resetAllData } from '@/lib/firebase/seed';
+import { useMatch } from '@/contexts/MatchContext';
 
 // ─── 게임 상태 전환 순서 ─────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ const STATUS_DOT: Record<GameStatus, string> = {
 // ─── 페이지 ──────────────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
+  const { matchId } = useMatch();
   const [status, setStatus] = useState<GameStatus>('BEFORE_MATCH');
   const [confirmNext, setConfirmNext] = useState<GameStatus | null>(null);
   const [predictions, setPredictions] = useState<PredictionDoc[]>([]);
@@ -51,10 +53,10 @@ export default function AdminDashboard() {
   const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
-    const unsubStatus = subscribeGameStatus(setStatus);
-    const unsubPreds = subscribePredictions(setPredictions);
+    const unsubStatus = subscribeGameStatus(matchId, setStatus);
+    const unsubPreds = subscribePredictions(matchId, setPredictions);
     return () => { unsubStatus(); unsubPreds(); };
-  }, []);
+  }, [matchId]);
 
   const stats = {
     total: predictions.length,
@@ -67,13 +69,13 @@ export default function AdminDashboard() {
 
   async function handleSeed() {
     setSeeding(true);
-    try { await seedSampleData(); } finally { setSeeding(false); }
+    try { await seedSampleData(matchId); } finally { setSeeding(false); }
   }
 
   async function handleReset() {
     if (!confirmReset) { setConfirmReset(true); return; }
     setResetting(true);
-    try { await resetAllData(); } finally { setResetting(false); setConfirmReset(false); }
+    try { await resetAllData(matchId); } finally { setResetting(false); setConfirmReset(false); }
   }
 
   async function handleStatusChange() {
@@ -82,7 +84,7 @@ export default function AdminDashboard() {
       setConfirmNext(nextTransition.to);
       return;
     }
-    await setGameStatus(nextTransition.to);
+    await setGameStatus(matchId, nextTransition.to);
     setConfirmNext(null);
   }
 

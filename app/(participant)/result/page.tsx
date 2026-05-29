@@ -12,6 +12,7 @@ import { subscribePredictions, type PredictionDoc } from '@/lib/firebase/predict
 import { computeScoreBreakdown } from '@/lib/scoring/calculator';
 import { sortByRanking, assignRanks } from '@/lib/scoring/tiebreaker';
 import { subscribeGameStatus } from '@/lib/firebase/gameStatus';
+import { useMatch } from '@/contexts/MatchContext';
 import type { GameStatus } from '@/types/game';
 
 function computeResults(
@@ -35,19 +36,21 @@ function computeResults(
 }
 
 export default function ResultPage() {
+  const { matchId } = useMatch();
   const [actualResult, setActualResult] = useState<ActualResultDoc | null>(null);
   const [predictions, setPredictions] = useState<PredictionDoc[]>([]);
   const [gameStatus, setGameStatus] = useState<GameStatus>('BEFORE_MATCH');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     let count = 0;
     const done = () => { if (++count >= 2) setLoading(false); };
-    const unsubResult = subscribeActualResult((r) => { setActualResult(r); done(); });
-    const unsubPreds = subscribePredictions((list) => { setPredictions(list); done(); });
-    const unsubStatus = subscribeGameStatus(setGameStatus);
+    const unsubResult = subscribeActualResult(matchId, (r) => { setActualResult(r); done(); });
+    const unsubPreds = subscribePredictions(matchId, (list) => { setPredictions(list); done(); });
+    const unsubStatus = subscribeGameStatus(matchId, setGameStatus);
     return () => { unsubResult(); unsubPreds(); unsubStatus(); };
-  }, []);
+  }, [matchId]);
 
   const rankedScores = actualResult ? computeResults(predictions, actualResult) : [];
   const top3 = rankedScores.filter((s) => s.rank <= 3);

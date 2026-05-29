@@ -8,15 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Lock, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { savePrediction } from '@/lib/firebase/predictions';
-import {
-  MATCH_RESULT_OPTIONS,
-  FIRST_GOAL_TEAM_OPTIONS,
-  FIRST_GOAL_TIME_OPTIONS,
-  CARD_RANGE_OPTIONS,
-  HALF_TIME_RESULT_OPTIONS,
-} from '@/constants/options';
-import { KOREA_PLAYER_DATA, MEXICO_PLAYER_DATA, type PlayerData } from '@/constants/players';
+import { FIRST_GOAL_TIME_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
+import { KOREA_PLAYER_DATA, type PlayerData } from '@/constants/players';
 import { SCORE_WEIGHTS } from '@/constants/gameConfig';
+import { useMatch } from '@/contexts/MatchContext';
 
 const POSITION_COLOR: Record<string, string> = {
   FW: 'bg-red-100 text-red-700',
@@ -36,10 +31,7 @@ function SectionLabel({ title, points }: { title: string; points: number }) {
 }
 
 function RadioGroup<T extends string>({
-  name,
-  options,
-  value,
-  onChange,
+  name, options, value, onChange,
 }: {
   name: string;
   options: { value: T; label: string }[];
@@ -71,12 +63,7 @@ function RadioGroup<T extends string>({
 }
 
 function PlayerSelector({
-  name,
-  players,
-  value,
-  onChange,
-  accentColor = 'korea-red',
-  noneLabel = '없음 (무득점)',
+  name, players, value, onChange, accentColor = 'korea-red', noneLabel = '없음 (무득점)',
 }: {
   name: string;
   players: PlayerData[];
@@ -93,7 +80,6 @@ function PlayerSelector({
       {players.map((p) => {
         const isNone = p.name === '없음';
         const isSelected = value === p.name;
-
         return (
           <label
             key={p.name}
@@ -109,28 +95,21 @@ function PlayerSelector({
               onChange={() => onChange(p.name)}
               className={`accent-${accentColor} shrink-0`}
             />
-
             {isNone ? (
               <span className="text-sm text-muted-foreground">{noneLabel}</span>
             ) : (
               <div className="flex flex-1 items-center justify-between min-w-0">
-                {/* 이름 + 포지션 */}
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-medium text-sm">{p.name}</span>
-                  <span
-                    className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ${POSITION_COLOR[p.position] ?? 'bg-slate-100 text-slate-500'}`}
-                  >
+                  <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ${POSITION_COLOR[p.position] ?? 'bg-slate-100 text-slate-500'}`}>
                     {p.position}
                   </span>
                 </div>
-
-                {/* 소속팀 / 골 / 확률 */}
                 <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
                   <span className="hidden sm:inline truncate max-w-[80px]">{p.club}</span>
                   <span className="font-medium">{p.nationalGoals}골</span>
                   <span className="flex items-center gap-0.5 text-emerald-600 font-semibold">
-                    <TrendingUp className="h-3 w-3" />
-                    {p.scoringProb}%
+                    <TrendingUp className="h-3 w-3" />{p.scoringProb}%
                   </span>
                 </div>
               </div>
@@ -144,6 +123,7 @@ function PlayerSelector({
 
 export default function PredictPage() {
   const router = useRouter();
+  const { matchId, match } = useMatch();
 
   const [name, setName] = useState('');
   const [matchResult, setMatchResult] = useState('');
@@ -158,29 +138,33 @@ export default function PredictPage() {
   const [mvp, setMvp] = useState('');
   const [comment, setComment] = useState('');
 
-  const totalGoals =
-    koreaScore !== '' && mexicoScore !== ''
-      ? Number(koreaScore) + Number(mexicoScore)
-      : null;
+  const matchResultOptions = [
+    { value: 'KOREA_WIN', label: match.matchResultLabels.KOREA_WIN },
+    { value: 'DRAW',      label: match.matchResultLabels.DRAW },
+    { value: 'MEXICO_WIN', label: match.matchResultLabels.MEXICO_WIN },
+  ];
+  const halfTimeResultOptions = [
+    { value: 'KOREA_LEAD', label: match.halfTimeResultLabels.KOREA_LEAD },
+    { value: 'DRAW',       label: match.halfTimeResultLabels.DRAW },
+    { value: 'MEXICO_LEAD', label: match.halfTimeResultLabels.MEXICO_LEAD },
+  ];
+  const firstGoalTeamOptions = [
+    { value: 'KOREA',  label: match.firstGoalTeamLabels.KOREA },
+    { value: 'MEXICO', label: match.firstGoalTeamLabels.MEXICO },
+    { value: 'NONE',   label: match.firstGoalTeamLabels.NONE },
+  ];
 
-  const isValid =
-    name.trim() &&
-    matchResult &&
-    koreaScore !== '' &&
-    mexicoScore !== '' &&
-    koreaFirstScorer &&
-    mexicoFirstScorer &&
-    firstGoalTeam &&
-    firstGoalTimeRange &&
-    halfTimeResult &&
-    cardRange &&
-    mvp;
+  const totalGoals = koreaScore !== '' && mexicoScore !== '' ? Number(koreaScore) + Number(mexicoScore) : null;
+
+  const isValid = name.trim() && matchResult && koreaScore !== '' && mexicoScore !== '' &&
+    koreaFirstScorer && mexicoFirstScorer && firstGoalTeam && firstGoalTimeRange &&
+    halfTimeResult && cardRange && mvp;
 
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!isValid) return;
     const participantId = `${name.trim()}_${Date.now()}`;
-    await savePrediction(participantId, {
+    await savePrediction(matchId, participantId, {
       name: name.trim(),
       team: 'BAP팀',
       matchResult,
@@ -195,13 +179,12 @@ export default function PredictPage() {
       mvp,
       comment,
     });
-    localStorage.setItem('wc_participant_id', participantId);
+    localStorage.setItem(`wc_participant_id_${matchId}`, participantId);
     router.push('/');
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* 헤더 */}
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/"><ChevronLeft className="h-5 w-5" /></Link>
@@ -212,44 +195,28 @@ export default function PredictPage() {
         </div>
       </div>
 
-      {/* 참여자 정보 */}
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base">참여자 정보</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <div>
             <label className="block text-sm font-medium mb-1">이름 *</label>
             <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              type="text" value={name} onChange={(e) => setName(e.target.value)}
               placeholder="이름을 입력하세요"
               className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">소속 팀</label>
-            <input
-              type="text"
-              value="BAP팀"
-              readOnly
-              className="w-full rounded-lg border bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
-            />
-          </div>
         </CardContent>
       </Card>
 
-      {/* 경기 결과 */}
       <Card>
-        <CardHeader className="pb-3">
-          <SectionLabel title="경기 결과" points={SCORE_WEIGHTS.matchResult} />
-        </CardHeader>
+        <CardHeader className="pb-3"><SectionLabel title="경기 결과" points={SCORE_WEIGHTS.matchResult} /></CardHeader>
         <CardContent>
-          <RadioGroup name="matchResult" options={MATCH_RESULT_OPTIONS} value={matchResult as never} onChange={setMatchResult} />
+          <RadioGroup name="matchResult" options={matchResultOptions} value={matchResult as never} onChange={setMatchResult} />
         </CardContent>
       </Card>
 
-      {/* 최종 스코어 */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel title="최종 스코어" points={SCORE_WEIGHTS.exactScore} />
@@ -267,7 +234,7 @@ export default function PredictPage() {
             </div>
             <span className="text-2xl font-bold text-muted-foreground">:</span>
             <div className="flex-1 text-center">
-              <label className="block text-xs text-muted-foreground mb-1">🇲🇽 멕시코</label>
+              <label className="block text-xs text-muted-foreground mb-1">{match.awayTeamFlag} {match.awayTeamName}</label>
               <input
                 type="number" min="0" max="20" value={mexicoScore}
                 onChange={(e) => setMexicoScore(e.target.value)}
@@ -281,7 +248,6 @@ export default function PredictPage() {
         </CardContent>
       </Card>
 
-      {/* 대한민국 첫 득점자 */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel title="🇰🇷 대한민국 첫 득점자" points={SCORE_WEIGHTS.koreaFirstScorer} />
@@ -289,45 +255,33 @@ export default function PredictPage() {
         </CardHeader>
         <CardContent>
           <PlayerSelector
-            name="koreaFirstScorer"
-            players={KOREA_PLAYER_DATA}
-            value={koreaFirstScorer}
-            onChange={setKoreaFirstScorer}
-            accentColor="korea-red"
-            noneLabel="없음 (대한민국 무득점)"
+            name="koreaFirstScorer" players={KOREA_PLAYER_DATA} value={koreaFirstScorer}
+            onChange={setKoreaFirstScorer} accentColor="korea-red" noneLabel="없음 (대한민국 무득점)"
           />
         </CardContent>
       </Card>
 
-      {/* 멕시코 첫 득점자 */}
       <Card>
         <CardHeader className="pb-3">
-          <SectionLabel title="🇲🇽 멕시코 첫 득점자" points={SCORE_WEIGHTS.koreaFirstScorer} />
+          <SectionLabel title={`${match.awayTeamFlag} ${match.awayTeamName} 첫 득점자`} points={SCORE_WEIGHTS.koreaFirstScorer} />
           <p className="text-xs text-muted-foreground">포지션 · A대표팀 통산 골 · 이번 경기 득점 확률</p>
         </CardHeader>
         <CardContent>
           <PlayerSelector
-            name="mexicoFirstScorer"
-            players={MEXICO_PLAYER_DATA}
-            value={mexicoFirstScorer}
-            onChange={setMexicoFirstScorer}
-            accentColor="green-600"
-            noneLabel="없음 (멕시코 무득점)"
+            name="mexicoFirstScorer" players={match.awayPlayerData} value={mexicoFirstScorer}
+            onChange={setMexicoFirstScorer} accentColor="green-600"
+            noneLabel={`없음 (${match.awayTeamName} 무득점)`}
           />
         </CardContent>
       </Card>
 
-      {/* 첫 골 팀 */}
       <Card>
-        <CardHeader className="pb-3">
-          <SectionLabel title="첫 골 팀" points={SCORE_WEIGHTS.firstGoalTeam} />
-        </CardHeader>
+        <CardHeader className="pb-3"><SectionLabel title="첫 골 팀" points={SCORE_WEIGHTS.firstGoalTeam} /></CardHeader>
         <CardContent>
-          <RadioGroup name="firstGoalTeam" options={FIRST_GOAL_TEAM_OPTIONS} value={firstGoalTeam as never} onChange={setFirstGoalTeam} />
+          <RadioGroup name="firstGoalTeam" options={firstGoalTeamOptions} value={firstGoalTeam as never} onChange={setFirstGoalTeam} />
         </CardContent>
       </Card>
 
-      {/* 첫 골 시간대 */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel title="첫 골 시간대" points={SCORE_WEIGHTS.firstGoalTimeRange} />
@@ -338,7 +292,6 @@ export default function PredictPage() {
         </CardContent>
       </Card>
 
-      {/* 전반전 결과 */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -349,21 +302,17 @@ export default function PredictPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <RadioGroup name="halfTimeResult" options={HALF_TIME_RESULT_OPTIONS} value={halfTimeResult as never} onChange={setHalfTimeResult} />
+          <RadioGroup name="halfTimeResult" options={halfTimeResultOptions} value={halfTimeResult as never} onChange={setHalfTimeResult} />
         </CardContent>
       </Card>
 
-      {/* 카드 수 */}
       <Card>
-        <CardHeader className="pb-3">
-          <SectionLabel title="양 팀 합산 카드 수" points={SCORE_WEIGHTS.cardRange} />
-        </CardHeader>
+        <CardHeader className="pb-3"><SectionLabel title="양 팀 합산 카드 수" points={SCORE_WEIGHTS.cardRange} /></CardHeader>
         <CardContent>
           <RadioGroup name="cardRange" options={CARD_RANGE_OPTIONS} value={cardRange as never} onChange={setCardRange} />
         </CardContent>
       </Card>
 
-      {/* MVP */}
       <Card>
         <CardHeader className="pb-3">
           <SectionLabel title="MVP 1차 예측" points={SCORE_WEIGHTS.mvp} />
@@ -371,8 +320,7 @@ export default function PredictPage() {
         </CardHeader>
         <CardContent>
           <select
-            value={mvp}
-            onChange={(e) => setMvp(e.target.value)}
+            value={mvp} onChange={(e) => setMvp(e.target.value)}
             className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
           >
             <option value="">선택하세요</option>
@@ -381,8 +329,8 @@ export default function PredictPage() {
                 <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
               ))}
             </optgroup>
-            <optgroup label="🇲🇽 멕시코">
-              {MEXICO_PLAYER_DATA.filter((p) => p.name !== '없음').map((p) => (
+            <optgroup label={`${match.awayTeamFlag} ${match.awayTeamName}`}>
+              {match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => (
                 <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
               ))}
             </optgroup>
@@ -390,22 +338,17 @@ export default function PredictPage() {
         </CardContent>
       </Card>
 
-      {/* 한 줄 코멘트 */}
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base">한 줄 코멘트 (선택)</CardTitle></CardHeader>
         <CardContent>
           <input
-            type="text"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="예: 후반 역전승 예상!"
-            maxLength={50}
+            type="text" value={comment} onChange={(e) => setComment(e.target.value)}
+            placeholder="예: 후반 역전승 예상!" maxLength={50}
             className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
           />
         </CardContent>
       </Card>
 
-      {/* 제출 버튼 */}
       <Button type="submit" variant="korea" size="xl" className="w-full" disabled={!isValid}>
         예측 제출하기
       </Button>
