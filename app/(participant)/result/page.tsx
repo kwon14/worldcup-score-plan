@@ -30,6 +30,7 @@ function computeResults(
       halfTimeScore: 0,
       rank: 0,
       usedHalftimeRevision: pred.halftimeRevised ?? false,
+      submittedAt: pred.createdAt,
     };
   });
   return assignRanks(sortByRanking(scores));

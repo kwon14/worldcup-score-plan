@@ -50,4 +50,5 @@ export interface ParticipantScore {
   halfTimeScore: number;
   rank: number;
   usedHalftimeRevision: boolean;
+  submittedAt?: unknown;
 }

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, Trophy, CheckCircle2, Loader2 } from 'lucide-react';
 import { KOREA_PLAYER_DATA } from '@/constants/players';
 import { getPrediction, savePrediction, type PredictionDoc } from '@/lib/firebase/predictions';
+import { getParticipantId } from '@/lib/firebase/auth';
 import { useMatch } from '@/contexts/MatchContext';
 
 export default function MvpPage() {
@@ -19,21 +20,32 @@ export default function MvpPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const id = typeof window !== 'undefined' ? localStorage.getItem(`wc_participant_id_${matchId}`) : null;
-    setParticipantId(id);
-    if (id) {
-      getPrediction(matchId, id).then((pred) => {
+    let cancelled = false;
+
+    async function loadPrediction() {
+      const authParticipantId = await getParticipantId();
+      const id = typeof window !== 'undefined'
+        ? localStorage.getItem(`wc_participant_id_${matchId}`) ?? authParticipantId
+        : authParticipantId;
+      if (cancelled) return;
+      setParticipantId(id);
+      if (id) {
+        const pred = await getPrediction(matchId, id);
+        if (cancelled) return;
         if (pred) {
           setMyPrediction(pred);
           setMvp(pred.finalMvp ?? pred.mvp);
           if (pred.finalMvp) setSubmitted(true);
         }
         setLoading(false);
-      });
-    } else {
-      setLoading(false);
+      } else {
+        setLoading(false);
+      }
     }
-  }, []);
+
+    loadPrediction();
+    return () => { cancelled = true; };
+  }, [matchId]);
 
   const allPlayers = [
     ...KOREA_PLAYER_DATA.filter((p) => p.name !== '없음'),

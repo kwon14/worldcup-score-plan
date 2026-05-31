@@ -71,7 +71,13 @@ export default function FinalInputPage() {
   const [matchStateData, setMatchStateData] = useState<MatchStateDoc | null>(null);
 
   useEffect(() => {
-    getMatchState(matchId).then(setMatchStateData);
+    getMatchState(matchId).then((state) => {
+      setMatchStateData(state);
+      if (state) {
+        setKoreaFinal(String(state.koreaScore));
+        setMexicoFinal(String(state.mexicoScore));
+      }
+    });
   }, [matchId]);
 
   const koreaNum = Number(koreaFinal);

@@ -32,9 +32,14 @@ const CARD_COLOR: Record<string, string> = {
   yellow_red: 'bg-orange-500',
 };
 
+function isKoreaTeam(teamName: string) {
+  const lower = teamName.toLowerCase();
+  return lower.includes('korea') || teamName.includes('대한민국');
+}
+
 // ── 서브 컴포넌트 ─────────────────────────────────────────────────────────────
 function GoalRow({ goal }: { goal: GoalEvent & { id: string } }) {
-  const isKorea = goal.teamName.toLowerCase().includes('korea');
+  const isKorea = isKoreaTeam(goal.teamName);
   const minute = `${goal.time}${goal.extraTime ? `+${goal.extraTime}` : ''}'`;
 
   return (
@@ -52,7 +57,7 @@ function GoalRow({ goal }: { goal: GoalEvent & { id: string } }) {
 }
 
 function CardRow({ card }: { card: CardEvent & { id: string } }) {
-  const isKorea = card.teamName.toLowerCase().includes('korea');
+  const isKorea = isKoreaTeam(card.teamName);
   const minute = `${card.time}'`;
 
   return (
@@ -77,8 +82,8 @@ function ScoreBanner({
   const isLive = LIVE_STATUSES.includes(short);
   const showScore = SHOW_DATA_STATUSES.includes(short);
 
-  const koreaGoals = goals.filter((g) => g.teamName.toLowerCase().includes('korea')).length;
-  const awayGoals = goals.filter((g) => !g.teamName.toLowerCase().includes('korea')).length;
+  const koreaGoals = goals.filter((g) => isKoreaTeam(g.teamName)).length;
+  const awayGoals = goals.filter((g) => !isKoreaTeam(g.teamName)).length;
 
   return (
     <div className="rounded-xl bg-gradient-to-r from-korea-blue to-korea-red p-5 text-white text-center space-y-3">
@@ -211,8 +216,8 @@ export function LiveMatchPanel({ matchId, compact = false }: LiveMatchPanelProps
   const showData = SHOW_DATA_STATUSES.includes(short);
   const isLive = LIVE_STATUSES.includes(short);
 
-  const koreaCards = cardEvents.filter((c) => c.teamName.toLowerCase().includes('korea'));
-  const mexicoCards = cardEvents.filter((c) => !c.teamName.toLowerCase().includes('korea'));
+  const koreaCards = cardEvents.filter((c) => isKoreaTeam(c.teamName));
+  const mexicoCards = cardEvents.filter((c) => !isKoreaTeam(c.teamName));
 
   return (
     <div className="space-y-3">
@@ -223,7 +228,7 @@ export function LiveMatchPanel({ matchId, compact = false }: LiveMatchPanelProps
       <div className="flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
         <Wifi className="h-3 w-3 text-green-500" />
         <span className={isLive ? 'text-green-600 font-medium' : ''}>
-          {isLive ? '실시간 연결됨 — 이벤트 즉시 반영' : 'Firebase 연결됨'}
+          {isLive ? 'Firebase 연결됨 — 관리자 입력 즉시 반영' : 'Firebase 연결됨'}
         </span>
       </div>
 

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Lock, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { savePrediction } from '@/lib/firebase/predictions';
+import { getOrCreateParticipantUser, useParticipantAuth } from '@/lib/firebase/auth';
 import { FIRST_GOAL_TIME_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
 import { KOREA_PLAYER_DATA, type PlayerData } from '@/constants/players';
 import { SCORE_WEIGHTS } from '@/constants/gameConfig';
@@ -124,8 +125,8 @@ function PlayerSelector({
 export default function PredictPage() {
   const router = useRouter();
   const { matchId, match } = useMatch();
+  const { status: authStatus, claims } = useParticipantAuth();
 
-  const [name, setName] = useState('');
   const [matchResult, setMatchResult] = useState('');
   const [koreaScore, setKoreaScore] = useState('');
   const [mexicoScore, setMexicoScore] = useState('');
@@ -156,16 +157,17 @@ export default function PredictPage() {
 
   const totalGoals = koreaScore !== '' && mexicoScore !== '' ? Number(koreaScore) + Number(mexicoScore) : null;
 
-  const isValid = name.trim() && matchResult && koreaScore !== '' && mexicoScore !== '' &&
+  const isValid = authStatus === 'signed-in' && !!claims?.name && matchResult && koreaScore !== '' && mexicoScore !== '' &&
     koreaFirstScorer && mexicoFirstScorer && firstGoalTeam && firstGoalTimeRange &&
     halfTimeResult && cardRange && mvp;
 
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
-    if (!isValid) return;
-    const participantId = `${name.trim()}_${Date.now()}`;
+    if (!isValid || !claims?.name) return;
+    const participant = await getOrCreateParticipantUser();
+    const participantId = participant.uid;
     await savePrediction(matchId, participantId, {
-      name: name.trim(),
+      name: claims.name,
       team: 'BAP팀',
       matchResult,
       koreaScore: Number(koreaScore),
@@ -198,15 +200,20 @@ export default function PredictPage() {
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base">참여자 정보</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1">이름 *</label>
-            <input
-              type="text" value={name} onChange={(e) => setName(e.target.value)}
-              placeholder="이름을 입력하세요"
-              className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
-              required
-            />
-          </div>
+          {authStatus === 'signed-in' ? (
+            <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+              <span className="text-muted-foreground">참여자: </span>
+              <span className="font-semibold">{claims?.name}</span>
+              {claims?.employeeId && <span className="ml-2 text-xs text-muted-foreground">({claims.employeeId})</span>}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-korea-red/20 bg-red-50 px-3 py-3 text-sm">
+              <p className="mb-2 font-semibold text-korea-red">예측 제출 전 로그인이 필요합니다.</p>
+              <Button type="button" variant="korea" size="sm" asChild>
+                <Link href="/login">로그인 / 최초 가입</Link>
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

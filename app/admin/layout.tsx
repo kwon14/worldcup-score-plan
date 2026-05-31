@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShieldCheck, Lock } from 'lucide-react';
+import { ShieldCheck, Lock, Loader2 } from 'lucide-react';
 import { MatchProvider, useMatch } from '@/contexts/MatchContext';
 import { MATCHES } from '@/constants/matches';
-
-const ADMIN_PIN = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? '0619';
-const SESSION_KEY = 'admin_authed';
+import { useAdminAuth } from '@/lib/firebase/adminAuth';
 
 function MatchTabs() {
   const { matchId, setMatchId } = useMatch();
@@ -30,26 +28,27 @@ function MatchTabs() {
 }
 
 function AdminContent({ children }: { children: React.ReactNode }) {
-  const [pin, setPin] = useState('');
-  const [authed, setAuthed] = useState(false);
-  const [error, setError] = useState(false);
+  const { status, claims, error, login, logout } = useAdminAuth();
+  const [name, setName] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [phone, setPhone] = useState('');
 
-  useEffect(() => {
-    if (sessionStorage.getItem(SESSION_KEY) === 'true') setAuthed(true);
-  }, []);
-
-  function handleLogin(e: { preventDefault(): void }) {
+  async function handleLogin(e: { preventDefault(): void }) {
     e.preventDefault();
-    if (pin === ADMIN_PIN) {
-      sessionStorage.setItem(SESSION_KEY, 'true');
-      setAuthed(true);
-      setError(false);
-    } else {
-      setError(true);
-    }
+    if (!name.trim() || !employeeId.trim() || !phone.trim()) return;
+    await login({ name: name.trim(), employeeId: employeeId.trim(), phone: phone.trim() });
   }
 
-  if (!authed) {
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 px-4 text-sm text-muted-foreground">
+        <Loader2 className="h-7 w-7 animate-spin" />
+        관리자 권한을 확인하는 중...
+      </div>
+    );
+  }
+
+  if (status !== 'admin') {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <Card className="w-full max-w-sm">
@@ -58,22 +57,41 @@ function AdminContent({ children }: { children: React.ReactNode }) {
               <Lock className="h-6 w-6 text-korea-red" />
             </div>
             <CardTitle className="text-center">운영자 전용</CardTitle>
-            <p className="text-xs text-muted-foreground text-center">PIN을 입력해주세요</p>
+            <p className="text-xs text-muted-foreground text-center">등록된 이름, 사번, 전화번호로 로그인해주세요</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-3">
               <input
-                type="password"
-                value={pin}
-                onChange={(e) => { setPin(e.target.value); setError(false); }}
-                placeholder="PIN 번호"
-                maxLength={8}
-                className={`w-full rounded-lg border px-3 py-2 text-center text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-korea-red/30 ${
-                  error ? 'border-red-400 bg-red-50' : ''
-                }`}
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="이름"
+                autoComplete="name"
+                className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
               />
-              {error && <p className="text-center text-xs text-red-500">PIN이 올바르지 않아요</p>}
-              <Button type="submit" variant="korea" className="w-full">입장</Button>
+              <input
+                type="text"
+                value={employeeId}
+                onChange={(e) => setEmployeeId(e.target.value)}
+                placeholder="사번 (예: 1113677)"
+                autoComplete="username"
+                className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
+              />
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="전화번호 (예: 01094074295)"
+                autoComplete="tel"
+                className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
+              />
+              {error && <p className="text-center text-xs text-red-500">{error}</p>}
+              {status === 'not-admin' && !error && (
+                <p className="text-center text-xs text-red-500">운영자/관리자 권한이 없는 계정입니다.</p>
+              )}
+              <Button type="submit" variant="korea" className="w-full" disabled={!name.trim() || !employeeId.trim() || !phone.trim()}>
+                로그인
+              </Button>
             </form>
           </CardContent>
         </Card>
@@ -87,10 +105,18 @@ function AdminContent({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2 px-4 py-3">
           <ShieldCheck className="h-5 w-5 text-korea-red" />
           <span className="font-bold text-sm">운영자 모드</span>
+          {claims?.name && (
+            <span className="text-xs text-muted-foreground">
+              {claims.name}
+              {claims.roleLabel && claims.role !== 'member' && (
+                <span className="ml-1 text-korea-red">({claims.roleLabel})</span>
+              )}
+            </span>
+          )}
           <Button
             variant="ghost" size="sm"
             className="ml-auto text-xs text-muted-foreground"
-            onClick={() => { sessionStorage.removeItem(SESSION_KEY); setAuthed(false); }}
+            onClick={() => { void logout(); }}
           >
             로그아웃
           </Button>

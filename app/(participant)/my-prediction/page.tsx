@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChevronLeft, Loader2, ClipboardList } from 'lucide-react';
 import { getPrediction, type PredictionDoc } from '@/lib/firebase/predictions';
+import { getParticipantId } from '@/lib/firebase/auth';
 import { useMatch } from '@/contexts/MatchContext';
 import { FIRST_GOAL_TIME_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
 
@@ -32,15 +33,24 @@ export default function MyPredictionPage() {
   const [prediction, setPrediction] = useState<PredictionDoc | null>(null);
 
   useEffect(() => {
-    const id = typeof window !== 'undefined' ? localStorage.getItem(`wc_participant_id_${matchId}`) : null;
-    if (id) {
-      getPrediction(matchId, id).then((pred) => {
+    let cancelled = false;
+
+    async function loadPrediction() {
+      const authParticipantId = await getParticipantId();
+      const id = typeof window !== 'undefined'
+        ? localStorage.getItem(`wc_participant_id_${matchId}`) ?? authParticipantId
+        : authParticipantId;
+
+      if (id) {
+        const pred = await getPrediction(matchId, id);
+        if (cancelled) return;
         setPrediction(pred);
-        setLoading(false);
-      });
-    } else {
+      }
       setLoading(false);
     }
+
+    loadPrediction();
+    return () => { cancelled = true; };
   }, [matchId]);
 
   if (loading) {

@@ -6,13 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Trash2, Plus } from 'lucide-react';
 import Link from 'next/link';
-import type { MatchStatusShort } from '@/types/match';
+import { getAuth } from 'firebase/auth';
+import type { MatchStatusShort, LiveMatchResponse, GoalEvent, CardEvent } from '@/types/match';
 import {
   subscribeMatchState, subscribeMatchEvents,
   updateMatchState, addGoalEvent, addCardEvent, deleteMatchEvent,
   initMatchState,
 } from '@/lib/firebase/matchState';
 import type { MatchStateDoc, MatchEventDoc } from '@/lib/firebase/matchState';
+import { app } from '@/lib/firebase/config';
 import { useMatch } from '@/contexts/MatchContext';
 import { KOREA_PLAYER_DATA } from '@/constants/players';
 
@@ -27,6 +29,36 @@ const STATUS_FLOW: { status: MatchStatusShort; label: string; color: string }[] 
 ];
 
 const KOREA_PLAYERS = [...KOREA_PLAYER_DATA.filter((p) => p.name !== '없음').map((p) => p.name), '직접 입력'];
+
+function isKoreaTeam(teamName: string) {
+  const lower = teamName.toLowerCase();
+  return lower.includes('korea') || teamName.includes('대한민국');
+}
+
+function toKoreaScorePayload(live: LiveMatchResponse) {
+  const koreaIsHome = isKoreaTeam(live.homeTeam);
+  return {
+    status: live.status?.short ?? 'NS',
+    koreaScore: (koreaIsHome ? live.homeScore : live.awayScore) ?? 0,
+    mexicoScore: (koreaIsHome ? live.awayScore : live.homeScore) ?? 0,
+    koreaHalfScore: koreaIsHome ? live.homeHalfScore : live.awayHalfScore,
+    mexicoHalfScore: koreaIsHome ? live.awayHalfScore : live.homeHalfScore,
+  };
+}
+
+function officialGoals(live: LiveMatchResponse): GoalEvent[] {
+  return live.goals.map((goal) => ({
+    ...goal,
+    teamName: isKoreaTeam(goal.teamName) ? 'Korea Republic' : live.homeTeam === goal.teamName ? live.homeTeam : live.awayTeam,
+  }));
+}
+
+function officialCards(live: LiveMatchResponse): CardEvent[] {
+  return live.cards.map((card) => ({
+    ...card,
+    teamName: isKoreaTeam(card.teamName) ? 'Korea Republic' : live.homeTeam === card.teamName ? live.homeTeam : live.awayTeam,
+  }));
+}
 
 // ── GoalForm ──────────────────────────────────────────────────────────────────
 
@@ -215,6 +247,10 @@ export default function AdminLivePage() {
   const [activeTab, setActiveTab] = useState<'status' | 'goal' | 'card'>('status');
   const [scoreInput, setScoreInput] = useState({ korea: '0', mexico: '0' });
   const [statusLoading, setStatusLoading] = useState(false);
+  const [officialData, setOfficialData] = useState<LiveMatchResponse | null>(null);
+  const [officialMode, setOfficialMode] = useState<'summary' | 'lineups' | null>(null);
+  const [officialLoading, setOfficialLoading] = useState(false);
+  const [officialError, setOfficialError] = useState<string | null>(null);
 
   const awayPlayers = [...match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => p.name), '직접 입력'];
 
@@ -245,6 +281,84 @@ export default function AdminLivePage() {
       koreaScore: Number(scoreInput.korea),
       mexicoScore: Number(scoreInput.mexico),
     });
+  }
+
+  async function requestOfficialData(mode: 'summary' | 'lineups' | 'final'): Promise<LiveMatchResponse> {
+    const user = getAuth(app).currentUser;
+    const idToken = await user?.getIdToken();
+    if (!idToken) throw new Error('관리자 로그인이 필요합니다.');
+
+    const res = await fetch(`/api/match/live?matchId=${encodeURIComponent(matchId)}&mode=${mode}`, {
+      cache: 'no-store',
+      headers: { Authorization: `Bearer ${idToken}` },
+    });
+    const data = (await res.json()) as LiveMatchResponse;
+    if (!res.ok || !data.available) throw new Error(data.error ?? '공식 API 조회에 실패했어요.');
+    return data;
+  }
+
+  async function handleFinalMatchEnd() {
+    setStatusLoading(true);
+    setOfficialLoading(true);
+    setOfficialError(null);
+    try {
+      const data = await requestOfficialData('final');
+      setOfficialData(data);
+      setOfficialMode('summary');
+      await Promise.all(events.map((event) => deleteMatchEvent(matchId, event.id)));
+      await updateMatchState(matchId, { ...toKoreaScorePayload(data), status: 'FT' });
+      for (const goal of officialGoals(data)) {
+        await addGoalEvent(matchId, goal);
+      }
+      for (const card of officialCards(data)) {
+        await addCardEvent(matchId, card);
+      }
+    } catch (err) {
+      setOfficialError(err instanceof Error ? err.message : '최종 경기 종료 처리에 실패했어요.');
+      await updateMatchState(matchId, {
+        status: 'FT',
+        koreaScore: Number(scoreInput.korea),
+        mexicoScore: Number(scoreInput.mexico),
+      });
+    } finally {
+      setOfficialLoading(false);
+      setStatusLoading(false);
+    }
+  }
+
+  async function fetchOfficial(mode: 'summary' | 'lineups') {
+    setOfficialLoading(true);
+    setOfficialError(null);
+    setOfficialMode(mode);
+    try {
+      const data = await requestOfficialData(mode);
+      setOfficialData(data);
+    } catch (err) {
+      setOfficialData(null);
+      setOfficialError(err instanceof Error ? err.message : '공식 API 조회에 실패했어요.');
+    } finally {
+      setOfficialLoading(false);
+    }
+  }
+
+  async function applyOfficialData() {
+    if (!officialData) return;
+    setOfficialLoading(true);
+    setOfficialError(null);
+    try {
+      await Promise.all(events.map((event) => deleteMatchEvent(matchId, event.id)));
+      await updateMatchState(matchId, toKoreaScorePayload(officialData));
+      for (const goal of officialGoals(officialData)) {
+        await addGoalEvent(matchId, goal);
+      }
+      for (const card of officialCards(officialData)) {
+        await addCardEvent(matchId, card);
+      }
+    } catch (err) {
+      setOfficialError(err instanceof Error ? err.message : 'Firebase 반영에 실패했어요.');
+    } finally {
+      setOfficialLoading(false);
+    }
   }
 
   const goalEvents = events.filter(
@@ -300,9 +414,57 @@ export default function AdminLivePage() {
               <p className="text-xs text-muted-foreground mt-0.5">{match.awayTeamName}</p>
             </div>
           </div>
-          <Button onClick={handleScoreUpdate} variant="outline" size="sm" className="w-full mt-3">
-            스코어 저장
-          </Button>
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <Button onClick={handleScoreUpdate} variant="outline" size="sm">
+              스코어 저장
+            </Button>
+            <Button onClick={handleFinalMatchEnd} variant="destructive" size="sm" disabled={statusLoading}>
+              최종 경기 종료
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 공식 API 수동 조회 */}
+      <Card className="border-blue-200 bg-blue-50/40">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">공식 경기정보 조회</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            공식 API는 참가자 화면에서 자동 조회하지 않고, 관리자 화면에서 누를 때만 조회합니다. 일일 100회 중 90회부터는 일반 조회를 막고, 최종 경기 종료 정산용 10회를 남겨둡니다.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={officialLoading} onClick={() => fetchOfficial('summary')}>
+              {officialLoading && officialMode === 'summary' ? '조회 중...' : '공식 경기정보 조회'}
+            </Button>
+            <Button type="button" variant="outline" size="sm" disabled={officialLoading} onClick={() => fetchOfficial('lineups')}>
+              {officialLoading && officialMode === 'lineups' ? '조회 중...' : '라인업 조회'}
+            </Button>
+          </div>
+          {officialError && <p className="text-xs text-red-600">{officialError}</p>}
+          {officialData && (
+            <div className="rounded-lg border bg-white p-3 text-xs space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold">조회 결과 미리보기</span>
+                <Badge variant="secondary">{officialData.status?.short ?? '상태 없음'}</Badge>
+              </div>
+              <p>
+                {officialData.homeTeam} {officialData.homeScore ?? '-'} : {officialData.awayScore ?? '-'} {officialData.awayTeam}
+              </p>
+              {officialMode === 'summary' && (
+                <p className="text-muted-foreground">득점 {officialData.goals.length}개 · 카드 {officialData.cards.length}개</p>
+              )}
+              {officialMode === 'lineups' && (
+                <p className="text-muted-foreground">라인업 {officialData.lineups.length}팀 조회됨</p>
+              )}
+              {officialMode === 'summary' && (
+                <Button type="button" size="sm" className="w-full" disabled={officialLoading} onClick={applyOfficialData}>
+                  이 내용으로 Firebase 반영
+                </Button>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

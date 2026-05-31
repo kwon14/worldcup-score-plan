@@ -13,6 +13,7 @@ import { SCORE_WEIGHTS, GOAL_TIME_ORDER } from '@/constants/gameConfig';
 import { LiveMatchPanel } from '@/components/game/LiveMatchPanel';
 import { subscribeMatchState, type MatchStateDoc } from '@/lib/firebase/matchState';
 import { subscribePredictions, getPrediction, savePrediction, type PredictionDoc } from '@/lib/firebase/predictions';
+import { getParticipantId } from '@/lib/firebase/auth';
 import { useMatch } from '@/contexts/MatchContext';
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
@@ -194,10 +195,18 @@ export default function HalfTimePage() {
   const [mexicoFirstScorer, setMexicoFirstScorer] = useState('');
 
   useEffect(() => {
-    const id = typeof window !== 'undefined' ? localStorage.getItem(`wc_participant_id_${matchId}`) : null;
-    setParticipantId(id);
-    if (id) {
-      getPrediction(matchId, id).then((pred) => {
+    let cancelled = false;
+
+    async function loadPrediction() {
+      const authParticipantId = await getParticipantId();
+      const id = typeof window !== 'undefined'
+        ? localStorage.getItem(`wc_participant_id_${matchId}`) ?? authParticipantId
+        : authParticipantId;
+      if (cancelled) return;
+      setParticipantId(id);
+      if (id) {
+        const pred = await getPrediction(matchId, id);
+        if (cancelled) return;
         if (pred) {
           setMyPrediction(pred);
           setMatchResult(pred.matchResult);
@@ -208,10 +217,13 @@ export default function HalfTimePage() {
           setMexicoFirstScorer(pred.mexicoFirstScorer);
         }
         setLoading(false);
-      });
-    } else {
-      setLoading(false);
+      } else {
+        setLoading(false);
+      }
     }
+
+    loadPrediction();
+    return () => { cancelled = true; };
   }, [matchId]);
 
   useEffect(() => subscribeMatchState(matchId, setMatchState), [matchId]);

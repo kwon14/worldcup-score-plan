@@ -1,0 +1,149 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+
+    function canOperate() {
+      return isSignedIn()
+        && (request.auth.token.role in ['admin', 'operator'] || request.auth.token.admin == true);
+    }
+
+    function isMatchCollection(collectionId, suffix) {
+      return collectionId.matches('m[0-9]+_' + suffix);
+    }
+
+    function isPredictionCollection(collectionId) {
+      return isMatchCollection(collectionId, 'predictions');
+    }
+
+    function isActualResultCollection(collectionId) {
+      return isMatchCollection(collectionId, 'actualResult');
+    }
+
+    function isGameStatusCollection(collectionId) {
+      return isMatchCollection(collectionId, 'gameStatus');
+    }
+
+    function isMatchStateCollection(collectionId) {
+      return isMatchCollection(collectionId, 'matchState');
+    }
+
+    function isMatchEventsCollection(collectionId) {
+      return isMatchCollection(collectionId, 'matchEvents');
+    }
+
+    function m1Status() {
+      return exists(/databases/$(database)/documents/m1_gameStatus/current)
+        ? get(/databases/$(database)/documents/m1_gameStatus/current).data.status
+        : 'BEFORE_MATCH';
+    }
+
+    function m2Status() {
+      return exists(/databases/$(database)/documents/m2_gameStatus/current)
+        ? get(/databases/$(database)/documents/m2_gameStatus/current).data.status
+        : 'BEFORE_MATCH';
+    }
+
+    function statusForCollection(collectionId) {
+      return collectionId == 'm1_predictions'
+        ? m1Status()
+        : collectionId == 'm2_predictions'
+          ? m2Status()
+          : 'LOCKED';
+    }
+
+    function isOwner(participantId) {
+      return isSignedIn() && request.auth.uid == participantId;
+    }
+
+    function hasRequiredPredictionFields(participantId) {
+      return request.resource.data.keys().hasAll([
+          'participantId', 'name', 'team', 'matchResult', 'koreaScore', 'mexicoScore',
+          'koreaFirstScorer', 'mexicoFirstScorer', 'firstGoalTeam', 'firstGoalTimeRange',
+          'halfTimeResult', 'cardRange', 'mvp', 'comment', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'participantId', 'name', 'team', 'matchResult', 'koreaScore', 'mexicoScore',
+          'koreaFirstScorer', 'mexicoFirstScorer', 'firstGoalTeam', 'firstGoalTimeRange',
+          'halfTimeResult', 'cardRange', 'mvp', 'comment', 'createdAt', 'updatedAt',
+          'halftimeRevised', 'finalMvp'
+        ])
+        && request.resource.data.participantId == participantId
+        && request.resource.data.name == request.auth.token.name;
+    }
+
+    function keepsImmutablePredictionFields(participantId) {
+      return isOwner(participantId)
+        && resource.data.participantId == participantId
+        && request.resource.data.participantId == participantId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.team == resource.data.team;
+    }
+
+    function isPredictionCreate(collectionId, participantId) {
+      return isOwner(participantId)
+        && statusForCollection(collectionId) == 'BEFORE_MATCH'
+        && hasRequiredPredictionFields(participantId)
+        && !request.resource.data.keys().hasAny(['halftimeRevised', 'finalMvp']);
+    }
+
+    function isOwnerPredictionUpdate(collectionId, participantId) {
+      return keepsImmutablePredictionFields(participantId)
+        && statusForCollection(collectionId) == 'BEFORE_MATCH'
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'participantId', 'createdAt', 'name', 'team', 'halftimeRevised', 'finalMvp'
+        ]);
+    }
+
+    function isHalfTimeRevision(collectionId, participantId) {
+      return keepsImmutablePredictionFields(participantId)
+        && statusForCollection(collectionId) == 'HALF_TIME'
+        && resource.data.halftimeRevised != true
+        && request.resource.data.halftimeRevised == true
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'matchResult', 'koreaScore', 'mexicoScore', 'koreaFirstScorer',
+          'mexicoFirstScorer', 'cardRange', 'halftimeRevised', 'updatedAt'
+        ]);
+    }
+
+    function isFinalMvpRevision(collectionId, participantId) {
+      return keepsImmutablePredictionFields(participantId)
+        && statusForCollection(collectionId) == 'AFTER_MATCH'
+        && !resource.data.keys().hasAny(['finalMvp'])
+        && request.resource.data.finalMvp is string
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['finalMvp', 'updatedAt']);
+    }
+
+    match /{collectionId}/{participantId} {
+      // A안: 예측 목록/상세는 경기 전부터 공개합니다. 쓰기만 강하게 제한합니다.
+      allow get: if isPredictionCollection(collectionId);
+      allow list: if isPredictionCollection(collectionId);
+      allow create: if isPredictionCollection(collectionId) && isPredictionCreate(collectionId, participantId);
+      allow update: if isPredictionCollection(collectionId)
+        && (isOwnerPredictionUpdate(collectionId, participantId)
+          || isHalfTimeRevision(collectionId, participantId)
+          || isFinalMvpRevision(collectionId, participantId));
+      allow delete: if canOperate();
+    }
+
+    match /{collectionId}/{document} {
+      allow read: if isActualResultCollection(collectionId)
+        || isGameStatusCollection(collectionId)
+        || isMatchStateCollection(collectionId)
+        || isMatchEventsCollection(collectionId);
+      allow write: if canOperate();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
