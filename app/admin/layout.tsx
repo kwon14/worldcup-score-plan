@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ShieldCheck, Lock, Loader2 } from 'lucide-react';
+import { ShieldCheck, Lock, Loader2, Home } from 'lucide-react';
 import { MatchProvider, useMatch } from '@/contexts/MatchContext';
 import { MATCHES } from '@/constants/matches';
 import { useAdminAuth } from '@/lib/firebase/adminAuth';
+import Link from 'next/link';
 
 function MatchTabs() {
   const { matchId, setMatchId } = useMatch();
@@ -113,13 +114,18 @@ function AdminContent({ children }: { children: React.ReactNode }) {
               )}
             </span>
           )}
-          <Button
-            variant="ghost" size="sm"
-            className="ml-auto text-xs text-muted-foreground"
-            onClick={() => { void logout(); }}
-          >
-            로그아웃
-          </Button>
+          <div className="ml-auto flex items-center gap-1">
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" asChild>
+              <Link href="/"><Home className="h-3.5 w-3.5 mr-1" />메인</Link>
+            </Button>
+            <Button
+              variant="ghost" size="sm"
+              className="text-xs text-muted-foreground"
+              onClick={() => { void logout(); }}
+            >
+              로그아웃
+            </Button>
+          </div>
         </div>
         <MatchTabs />
       </div>

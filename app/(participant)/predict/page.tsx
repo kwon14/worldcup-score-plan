@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,10 +9,12 @@ import { ChevronLeft, Lock, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { savePrediction } from '@/lib/firebase/predictions';
 import { getOrCreateParticipantUser, useParticipantAuth } from '@/lib/firebase/auth';
+import { subscribeGameStatus } from '@/lib/firebase/gameStatus';
 import { FIRST_GOAL_TIME_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
 import { KOREA_PLAYER_DATA, type PlayerData } from '@/constants/players';
 import { SCORE_WEIGHTS } from '@/constants/gameConfig';
 import { useMatch } from '@/contexts/MatchContext';
+import type { GameStatus } from '@/types/game';
 
 const POSITION_COLOR: Record<string, string> = {
   FW: 'bg-red-100 text-red-700',
@@ -126,6 +128,11 @@ export default function PredictPage() {
   const router = useRouter();
   const { matchId, match } = useMatch();
   const { status: authStatus, claims } = useParticipantAuth();
+  const [gameStatus, setGameStatus] = useState<GameStatus>('BEFORE_MATCH');
+
+  useEffect(() => {
+    return subscribeGameStatus(matchId, setGameStatus);
+  }, [matchId]);
 
   const [matchResult, setMatchResult] = useState('');
   const [koreaScore, setKoreaScore] = useState('');
@@ -183,6 +190,31 @@ export default function PredictPage() {
     });
     localStorage.setItem(`wc_participant_id_${matchId}`, participantId);
     router.push('/');
+  }
+
+  if (gameStatus !== 'BEFORE_MATCH') {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/"><ChevronLeft className="h-5 w-5" /></Link>
+          </Button>
+          <h1 className="font-bold text-lg">경기 전 예측</h1>
+        </div>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
+            <Lock className="h-10 w-10 text-muted-foreground" />
+            <div>
+              <p className="font-semibold">예측 제출이 마감됐어요</p>
+              <p className="text-sm text-muted-foreground mt-1">경기가 시작된 후에는 예측을 제출할 수 없어요.</p>
+            </div>
+            <Button variant="korea" asChild>
+              <Link href="/">홈으로</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
