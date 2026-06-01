@@ -8,7 +8,6 @@ import {
   type Auth,
   type User,
 } from 'firebase/auth';
-import { initializeApp, getApps } from 'firebase/app';
 import { app } from './config';
 
 export type AdminAuthStatus = 'loading' | 'signed-out' | 'not-admin' | 'admin';
@@ -22,20 +21,14 @@ interface AdminAuthState {
   logout(): Promise<void>;
 }
 
-// 참여자 Auth와 별도 인스턴스 — signOut이 서로 영향 안 줌
-const ADMIN_APP_NAME = 'admin-client';
+// 참여자 Auth와 동일한 인스턴스 사용 — /login에서 로그인하면 admin 페이지도 자동 인식
 let authInstance: Auth | null = null;
 
 function adminAuth(): Auth {
   if (typeof window === 'undefined') {
     throw new Error('Firebase Auth is only available in the browser');
   }
-  if (!authInstance) {
-    const adminClientApp =
-      getApps().find((a) => a.name === ADMIN_APP_NAME) ??
-      initializeApp(app.options, ADMIN_APP_NAME);
-    authInstance = getAuth(adminClientApp);
-  }
+  authInstance ??= getAuth(app);
   return authInstance;
 }
 
