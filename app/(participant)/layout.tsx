@@ -4,7 +4,7 @@ import { MatchProvider, useMatch } from '@/contexts/MatchContext';
 import { MATCHES } from '@/constants/matches';
 import type { ReactNode } from 'react';
 import { useParticipantAuth } from '@/lib/firebase/auth';
-import { LogOut } from 'lucide-react';
+import { LogOut, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 function UserBar() {
@@ -22,6 +22,8 @@ function UserBar() {
     );
   }
 
+  const isAdmin = claims?.role === 'admin' || claims?.role === 'operator';
+
   return (
     <div className="flex items-center justify-between mb-3 px-0.5">
       <span className="text-xs text-muted-foreground">
@@ -30,13 +32,24 @@ function UserBar() {
           <span className="ml-1 text-korea-red">({claims.roleLabel})</span>
         )}
       </span>
-      <button
-        onClick={() => void logout()}
-        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <LogOut className="h-3 w-3" />
-        로그아웃
-      </button>
+      <div className="flex items-center gap-3">
+        {isAdmin && (
+          <Link
+            href="/admin"
+            className="flex items-center gap-1 text-xs font-medium text-korea-red hover:underline"
+          >
+            <ShieldCheck className="h-3 w-3" />
+            관리자 페이지
+          </Link>
+        )}
+        <button
+          onClick={() => void logout()}
+          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <LogOut className="h-3 w-3" />
+          로그아웃
+        </button>
+      </div>
     </div>
   );
 }
