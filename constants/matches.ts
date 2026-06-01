@@ -44,9 +44,9 @@ export const MATCHES: Record<string, MatchConfig> = {
     label: '1차전',
     awayTeamName: '체코',
     awayTeamFlag: '🇨🇿',
-    date: '2026년 6월 15일 (KST)',
-    localDate: '현지 일정 미정',
-    venue: '미정',
+    date: '2026년 6월 12일 11:00 (KST)',
+    localDate: '현지: 6월 11일 21:00 (CDT)',
+    venue: '에스타디오 아크론, 과달라하라',
     awayPlayerData: CZECH_PLAYER_DATA,
     awayTeamInfo: {
       rank: 'FIFA 40위',
