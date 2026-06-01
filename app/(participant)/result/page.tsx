@@ -15,12 +15,24 @@ import { subscribeGameStatus } from '@/lib/firebase/gameStatus';
 import { useMatch } from '@/contexts/MatchContext';
 import type { GameStatus } from '@/types/game';
 
+function computeMvpWinner(predictions: PredictionDoc[]): string | null {
+  const counts = new Map<string, number>();
+  for (const p of predictions) {
+    const mvp = p.finalMvp ?? p.mvp;
+    if (mvp) counts.set(mvp, (counts.get(mvp) ?? 0) + 1);
+  }
+  if (counts.size === 0) return null;
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+}
+
 function computeResults(
   predictions: PredictionDoc[],
   actual: ActualResultDoc,
 ): ParticipantScore[] {
+  const mvpWinner = computeMvpWinner(predictions);
+  const effectiveActual = { ...actual, officialMvp: mvpWinner ?? '' };
   const scores: ParticipantScore[] = predictions.map((pred) => {
-    const breakdown = computeScoreBreakdown(pred, actual);
+    const breakdown = computeScoreBreakdown(pred, effectiveActual);
     const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
     return {
       participantId: pred.participantId,
@@ -34,6 +46,34 @@ function computeResults(
     };
   });
   return assignRanks(sortByRanking(scores));
+}
+
+function MvpVoteResult({ predictions }: { predictions: PredictionDoc[] }) {
+  const counts = new Map<string, number>();
+  for (const p of predictions) {
+    const mvp = p.finalMvp ?? p.mvp;
+    if (mvp) counts.set(mvp, (counts.get(mvp) ?? 0) + 1);
+  }
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const winner = sorted[0]?.[0];
+  const total = predictions.length;
+
+  return (
+    <Card className="border-yellow-300">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">🏅 MVP 투표 결과</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {sorted.map(([name, count], i) => (
+          <div key={name} className={`flex items-center gap-3 rounded-lg px-3 py-2 ${i === 0 ? 'bg-yellow-50 border border-yellow-300' : 'bg-muted/30'}`}>
+            <span className="text-sm">{i === 0 ? '🥇' : `${i + 1}위`}</span>
+            <span className={`flex-1 text-sm font-medium ${name === winner ? 'text-yellow-700' : ''}`}>{name}</span>
+            <span className="text-sm text-muted-foreground">{count}표 ({Math.round(count / total * 100)}%)</span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function ResultPage() {
@@ -121,6 +161,8 @@ export default function ResultPage() {
               </Card>
             ))}
           </div>
+
+          <MvpVoteResult predictions={predictions} />
 
           <Card>
             <CardHeader className="pb-3">

@@ -27,7 +27,7 @@ export interface ActualResult {
   firstGoalTimeRange: FirstGoalTimeRange;
   halfTimeResult: HalfTimeResult;
   cardRange: CardRange;
-  officialMvp: string;
+  officialMvp?: string;
 }
 
 export interface ScoreBreakdown {

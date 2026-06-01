@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ChevronLeft, Info, Trophy } from 'lucide-react';
+import { ChevronLeft, Info } from 'lucide-react';
 import { FIRST_GOAL_TIME_OPTIONS, FIRST_GOAL_TEAM_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
 import { KOREA_PLAYER_DATA } from '@/constants/players';
 import { useMatch } from '@/contexts/MatchContext';
@@ -65,7 +65,6 @@ export default function FinalInputPage() {
   const [koreaFirstScorer, setKoreaFirstScorer] = useState('');
   const [mexicoFirstScorer, setMexicoFirstScorer] = useState('');
   const [cardRange, setCardRange] = useState('');
-  const [mvp, setMvp] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [matchStateData, setMatchStateData] = useState<MatchStateDoc | null>(null);
@@ -106,8 +105,7 @@ export default function FinalInputPage() {
     firstGoalTime !== '' &&
     koreaFirstScorer !== '' &&
     mexicoFirstScorer !== '' &&
-    cardRange !== '' &&
-    mvp !== '';
+    cardRange !== '';
 
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -129,7 +127,6 @@ export default function FinalInputPage() {
         firstGoalTimeRange: firstGoalTime as FirstGoalTimeRange,
         halfTimeResult: halfTimeResultCode,
         cardRange: cardRange as CardRange,
-        officialMvp: mvp,
       });
       await setGameStatus(matchId, 'AFTER_MATCH');
       router.push('/admin');
@@ -238,31 +235,6 @@ export default function FinalInputPage() {
         />
       </SectionCard>
 
-      {/* 운영진 선정 MVP */}
-      <SectionCard title="운영진 선정 MVP">
-        <div className="flex items-center gap-2 rounded-lg border border-yellow-300 bg-yellow-50 p-3 mb-3">
-          <Trophy className="h-4 w-4 text-yellow-600 shrink-0" />
-          <p className="text-xs text-yellow-800">공식 MOM 발표가 없으면 현장 투표 또는 운영진 선정</p>
-        </div>
-        <select
-          value={mvp}
-          onChange={(e) => setMvp(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
-        >
-          <option value="">선택하세요</option>
-          <optgroup label="🇰🇷 대한민국">
-            {KOREA_PLAYER_DATA.filter((p) => p.name !== '없음').map((p) => (
-              <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
-            ))}
-          </optgroup>
-          <optgroup label={`${match.awayTeamFlag} ${match.awayTeamName}`}>
-            {match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => (
-              <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
-            ))}
-          </optgroup>
-        </select>
-      </SectionCard>
-
       {/* 확인 단계 */}
       {showConfirm && (
         <div className="rounded-xl border-2 border-red-400 bg-red-50 p-4 space-y-3">
@@ -273,7 +245,7 @@ export default function FinalInputPage() {
               <p>🏆 최종 스코어: 대한민국 {koreaFinal} : {mexicoFinal} {match.awayTeamName}</p>
               <p>⚽ 첫 골: {firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : firstGoalTeam === 'MEXICO' ? `${match.awayTeamFlag} ${match.awayTeamName}` : '없음'} {firstGoalTime && `· ${FIRST_GOAL_TIME_LABEL[firstGoalTime]}`}</p>
               <p>🇰🇷 한국 첫 득점자: {koreaFirstScorer} · {match.awayTeamFlag} {match.awayTeamName}: {mexicoFirstScorer}</p>
-              <p>🟨 카드: {CARD_RANGE_LABEL[cardRange]} · 🏅 MVP: {mvp}</p>
+              <p>🟨 카드: {CARD_RANGE_LABEL[cardRange]}</p>
               <p className="font-semibold text-red-700 mt-1">저장하면 전체 점수가 자동 계산됩니다.</p>
             </div>
           </div>
