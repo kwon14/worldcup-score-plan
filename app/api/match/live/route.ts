@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getLiveMatchData } from '@/lib/api/football';
+import { getEspnLiveMatchData } from '@/lib/api/espn';
 import { getAdminAuth } from '@/lib/firebase/admin';
 import type { LiveMatchResponse } from '@/types/match';
 
@@ -26,10 +26,8 @@ export async function GET(req: NextRequest) {
   const mode = req.nextUrl.searchParams.get('mode') ?? 'summary';
 
   try {
-    const response = await getLiveMatchData(matchId, {
-      includeEvents: mode === 'summary' || mode === 'final' || mode === 'full',
+    const response = await getEspnLiveMatchData(matchId, {
       includeLineups: mode === 'lineups' || mode === 'full',
-      useReservedQuota: mode === 'final',
     });
     return NextResponse.json(response);
   } catch (error) {
