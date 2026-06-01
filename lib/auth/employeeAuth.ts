@@ -1,8 +1,8 @@
 import { type AllowlistEntry, type EmployeeRole } from '@/lib/auth/allowlist';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase/admin';
-import { findAllowedEmployee, isAdminRole, mapEmployeeRole, type EmployeeAuthPayload, type NormalizedRole } from '@/lib/auth/employeeIdentity';
+import { findAllowedEmployee, isAdminRole, isOperatorRole, mapEmployeeRole, type EmployeeAuthPayload, type NormalizedRole } from '@/lib/auth/employeeIdentity';
 
-export { findAllowedEmployee, isAdminRole, mapEmployeeRole };
+export { findAllowedEmployee, isAdminRole, isOperatorRole, mapEmployeeRole };
 export type { EmployeeAuthPayload, NormalizedRole };
 
 export interface EmployeeAuthResult {
@@ -24,6 +24,7 @@ export async function issueEmployeeToken(employee: AllowlistEntry): Promise<Empl
     roleLabel: employee.role,
     employeeId: employee.employeeId,
     admin: isAdminRole(role),
+    operator: isOperatorRole(role),
   };
 
   await adminAuth.updateUser(uid, {

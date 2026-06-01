@@ -7,7 +7,8 @@ const WC_LEAGUE = 1;
 const WC_SEASON = 2026;
 const KOREA_TEAM_ID = 149;
 const AWAY_TEAM_IDS: Record<string, number> = {
-  '2': 164,
+  '1': 56,   // Czech Republic
+  '2': 164,  // Mexico
 };
 
 const FALLBACK_TEAMS: Record<string, { homeTeam: string; awayTeam: string }> = {

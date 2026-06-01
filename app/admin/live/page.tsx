@@ -47,16 +47,18 @@ function toKoreaScorePayload(live: LiveMatchResponse) {
 }
 
 function officialGoals(live: LiveMatchResponse): GoalEvent[] {
+  const awayTeam = isKoreaTeam(live.homeTeam) ? live.awayTeam : live.homeTeam;
   return live.goals.map((goal) => ({
     ...goal,
-    teamName: isKoreaTeam(goal.teamName) ? 'Korea Republic' : live.homeTeam === goal.teamName ? live.homeTeam : live.awayTeam,
+    teamName: isKoreaTeam(goal.teamName) ? 'Korea Republic' : awayTeam,
   }));
 }
 
 function officialCards(live: LiveMatchResponse): CardEvent[] {
+  const awayTeam = isKoreaTeam(live.homeTeam) ? live.awayTeam : live.homeTeam;
   return live.cards.map((card) => ({
     ...card,
-    teamName: isKoreaTeam(card.teamName) ? 'Korea Republic' : live.homeTeam === card.teamName ? live.homeTeam : live.awayTeam,
+    teamName: isKoreaTeam(card.teamName) ? 'Korea Republic' : awayTeam,
   }));
 }
 
@@ -307,12 +309,8 @@ export default function AdminLivePage() {
       setOfficialMode('summary');
       await Promise.all(events.map((event) => deleteMatchEvent(matchId, event.id)));
       await updateMatchState(matchId, { ...toKoreaScorePayload(data), status: 'FT' });
-      for (const goal of officialGoals(data)) {
-        await addGoalEvent(matchId, goal);
-      }
-      for (const card of officialCards(data)) {
-        await addCardEvent(matchId, card);
-      }
+      await Promise.all(officialGoals(data).map((goal) => addGoalEvent(matchId, goal)));
+      await Promise.all(officialCards(data).map((card) => addCardEvent(matchId, card)));
     } catch (err) {
       setOfficialError(err instanceof Error ? err.message : '최종 경기 종료 처리에 실패했어요.');
       await updateMatchState(matchId, {
@@ -348,12 +346,8 @@ export default function AdminLivePage() {
     try {
       await Promise.all(events.map((event) => deleteMatchEvent(matchId, event.id)));
       await updateMatchState(matchId, toKoreaScorePayload(officialData));
-      for (const goal of officialGoals(officialData)) {
-        await addGoalEvent(matchId, goal);
-      }
-      for (const card of officialCards(officialData)) {
-        await addCardEvent(matchId, card);
-      }
+      await Promise.all(officialGoals(officialData).map((goal) => addGoalEvent(matchId, goal)));
+      await Promise.all(officialCards(officialData).map((card) => addCardEvent(matchId, card)));
     } catch (err) {
       setOfficialError(err instanceof Error ? err.message : 'Firebase 반영에 실패했어요.');
     } finally {

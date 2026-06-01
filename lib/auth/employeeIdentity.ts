@@ -23,7 +23,11 @@ export function mapEmployeeRole(role: EmployeeRole): NormalizedRole {
 }
 
 export function isAdminRole(role: NormalizedRole): boolean {
-  return role === 'admin' || role === 'operator';
+  return role === 'admin';
+}
+
+export function isOperatorRole(role: NormalizedRole): boolean {
+  return role === 'operator';
 }
 
 export function findAllowedEmployee(payload: EmployeeAuthPayload): AllowlistEntry | null {

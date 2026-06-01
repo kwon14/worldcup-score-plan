@@ -30,9 +30,7 @@ function timestampToMillis(value: unknown): number | null {
 function compareSubmittedAt(a: ParticipantScore, b: ParticipantScore): number {
   const aTime = timestampToMillis(a.submittedAt);
   const bTime = timestampToMillis(b.submittedAt);
-  if (aTime == null && bTime == null) return 0;
-  if (aTime == null) return 1;
-  if (bTime == null) return -1;
+  if (aTime == null || bTime == null) return 0;
   return aTime - bTime;
 }
 
