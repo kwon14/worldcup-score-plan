@@ -68,8 +68,8 @@ function parseKeyEvents(keyEvents: any[], homeTeamId: string): {
     const { time, extraTime } = parseMinute(ev.clock?.displayValue ?? '0\'');
     const participants = ev.participants ?? [];
 
-    if (typeText === 'Goal' && !ev.shootout) {
-      const text: string = (ev.text ?? '').toLowerCase();
+    if (typeText.includes('Goal') && !ev.shootout) {
+      const text: string = `${typeText} ${ev.text ?? ''}`.toLowerCase();
       const scorer: string = participants[0]?.athlete?.displayName ?? '';
       const assist: string | null = participants[1]?.athlete?.displayName ?? null;
       const type: GoalEvent['type'] =
