@@ -9,6 +9,7 @@ import { ChevronRight, Users, ClipboardList, Trophy, AlertTriangle, DatabaseZap,
 import type { GameStatus } from '@/types/game';
 import { GAME_STATUS_LABELS } from '@/lib/game/gameState';
 import { subscribeGameStatus, setGameStatus } from '@/lib/firebase/gameStatus';
+import { subscribeActualResult, type ActualResultDoc } from '@/lib/firebase/results';
 import { subscribePredictions, type PredictionDoc } from '@/lib/firebase/predictions';
 import { seedSampleData, resetAllData } from '@/lib/firebase/seed';
 import { useMatch } from '@/contexts/MatchContext';
@@ -48,6 +49,7 @@ export default function AdminDashboard() {
   const [status, setStatus] = useState<GameStatus>('BEFORE_MATCH');
   const [confirmNext, setConfirmNext] = useState<GameStatus | null>(null);
   const [predictions, setPredictions] = useState<PredictionDoc[]>([]);
+  const [actualResult, setActualResult] = useState<ActualResultDoc | null>(null);
   const [seeding, setSeeding] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -55,7 +57,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     const unsubStatus = subscribeGameStatus(matchId, setStatus);
     const unsubPreds = subscribePredictions(matchId, setPredictions);
-    return () => { unsubStatus(); unsubPreds(); };
+    const unsubResult = subscribeActualResult(matchId, setActualResult);
+    return () => { unsubStatus(); unsubPreds(); unsubResult(); };
   }, [matchId]);
 
   const stats = {
@@ -66,6 +69,7 @@ export default function AdminDashboard() {
   };
 
   const nextTransition = STATUS_FLOW.find((f) => f.from === status);
+  const cannotOpenResult = nextTransition?.to === 'RESULT_OPEN' && !actualResult;
 
   async function handleSeed() {
     setSeeding(true);
@@ -79,7 +83,7 @@ export default function AdminDashboard() {
   }
 
   async function handleStatusChange() {
-    if (!nextTransition) return;
+    if (!nextTransition || cannotOpenResult) return;
     if (nextTransition.danger && confirmNext !== nextTransition.to) {
       setConfirmNext(nextTransition.to);
       return;
@@ -129,9 +133,16 @@ export default function AdminDashboard() {
                 className="w-full"
                 variant={nextTransition.danger ? 'destructive' : 'korea'}
                 onClick={handleStatusChange}
+                disabled={cannotOpenResult}
               >
                 {nextTransition.label}
               </Button>
+            )}
+            {cannotOpenResult && (
+              <div className="flex items-start gap-2 rounded-lg border border-orange-300 bg-orange-50 p-3 text-xs text-orange-700">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <p>최종 결과를 먼저 저장해야 순위를 공개할 수 있어요. 아래 <strong>최종 결과 입력</strong>에서 경기 결과를 저장해 주세요.</p>
+              </div>
             )}
             <p className="text-center text-xs text-muted-foreground">
               {GAME_STATUS_LABELS[status]} → {GAME_STATUS_LABELS[nextTransition.to]}

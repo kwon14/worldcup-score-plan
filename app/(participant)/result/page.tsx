@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RankingTable } from '@/components/game/RankingTable';
-import { ChevronLeft, Loader2, Lock } from 'lucide-react';
+import { ChevronLeft, Loader2, Lock, Trophy } from 'lucide-react';
 import type { ParticipantScore } from '@/types/result';
 import { subscribeActualResult, type ActualResultDoc } from '@/lib/firebase/results';
 import { subscribePredictions, type PredictionDoc } from '@/lib/firebase/predictions';
@@ -76,6 +76,27 @@ function MvpVoteResult({ predictions }: { predictions: PredictionDoc[] }) {
   );
 }
 
+function EmptyResultNotice({
+  title,
+  description,
+  icon = 'lock',
+}: {
+  title: string;
+  description: string;
+  icon?: 'lock' | 'trophy';
+}) {
+  const Icon = icon === 'trophy' ? Trophy : Lock;
+  return (
+    <Card className="border-slate-200">
+      <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+        <Icon className="h-8 w-8 text-muted-foreground" />
+        <p className="font-semibold">{title}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ResultPage() {
   const { matchId } = useMatch();
   const [actualResult, setActualResult] = useState<ActualResultDoc | null>(null);
@@ -120,13 +141,18 @@ export default function ResultPage() {
 
       {/* 결과 비공개 안내 */}
       {!isResultOpen && (
-        <Card className="border-slate-200">
-          <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
-            <Lock className="h-8 w-8 text-muted-foreground" />
-            <p className="font-semibold">결과가 아직 공개되지 않았어요</p>
-            <p className="text-sm text-muted-foreground">운영자가 결과를 공개하면 순위를 확인할 수 있어요.</p>
-          </CardContent>
-        </Card>
+        <EmptyResultNotice
+          title="결과가 아직 공개되지 않았어요"
+          description="운영자가 결과를 공개하면 순위를 확인할 수 있어요."
+        />
+      )}
+
+      {isResultOpen && !actualResult && (
+        <EmptyResultNotice
+          icon="trophy"
+          title="최종 경기 결과가 아직 입력되지 않았어요"
+          description="운영자 화면에서 최종 결과를 먼저 저장하면 순위가 자동 계산됩니다."
+        />
       )}
 
       {/* 실제 경기 결과 */}
@@ -145,6 +171,14 @@ export default function ResultPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {isResultOpen && actualResult && predictions.length === 0 && (
+        <EmptyResultNotice
+          icon="trophy"
+          title="참여자 예측 데이터가 없어요"
+          description="예측 제출 데이터가 들어오면 전체 순위가 표시됩니다."
+        />
       )}
 
       {/* 시상 및 순위 (결과 공개 후) */}
