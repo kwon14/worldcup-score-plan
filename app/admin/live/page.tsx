@@ -251,6 +251,7 @@ export default function AdminLivePage() {
   const [selectedStatus, setSelectedStatus] = useState<MatchStatusShort>('NS');
   const [halfScoreInput, setHalfScoreInput] = useState({ korea: '0', mexico: '0' });
   const [statusLoading, setStatusLoading] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<MatchStatusShort | null>(null);
   const [officialData, setOfficialData] = useState<LiveMatchResponse | null>(null);
   const [officialMode, setOfficialMode] = useState<'summary' | 'lineups' | null>(null);
   const [officialLoading, setOfficialLoading] = useState(false);
@@ -361,8 +362,9 @@ export default function AdminLivePage() {
     setOfficialLoading(true);
     setOfficialError(null);
     try {
+      const { status: _ignored, ...scoreOnly } = toKoreaScorePayload(officialData);
       await Promise.all(events.map((event) => deleteMatchEvent(matchId, event.id)));
-      await updateMatchState(matchId, toKoreaScorePayload(officialData));
+      await updateMatchState(matchId, scoreOnly);
       await Promise.all(officialGoals(officialData).map((goal) => addGoalEvent(matchId, goal)));
       await Promise.all(officialCards(officialData).map((card) => addCardEvent(matchId, card)));
     } catch (err) {
@@ -388,8 +390,6 @@ export default function AdminLivePage() {
   }
 
   const currentStatusLabel = STATUS_FLOW.find((s) => s.status === matchState.status)?.label ?? matchState.status;
-  const selectedStatusLabel = STATUS_FLOW.find((s) => s.status === selectedStatus)?.label ?? selectedStatus;
-  const statusChanged = selectedStatus !== matchState.status;
 
   return (
     <div className="space-y-4">
@@ -519,36 +519,35 @@ export default function AdminLivePage() {
           <CardContent className="space-y-2">
             {STATUS_FLOW.map((s) => {
               const isCurrent = matchState.status === s.status;
-              const isSelected = selectedStatus === s.status;
+              const isSelected = (selectedStatus ?? matchState.status) === s.status;
               return (
                 <button key={s.status} type="button" disabled={statusLoading}
                   onClick={() => setSelectedStatus(s.status)}
                   className={`w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-                    isSelected
+                    isCurrent
                       ? 'border-slate-900 bg-slate-900 text-white'
-                      : 'border-border hover:bg-muted/50'
+                      : isSelected
+                        ? 'border-korea-red bg-red-50 text-korea-red'
+                        : 'border-border hover:bg-muted/50'
                   }`}>
                   <span className={`h-2.5 w-2.5 rounded-full ${s.color} shrink-0`} />
                   <span className="text-sm font-medium">{s.label}</span>
-                  <div className="ml-auto flex items-center gap-1.5">
-                    {isCurrent && (
-                      <Badge className={`text-xs ${isSelected ? 'bg-white text-slate-900' : ''}`}>현재</Badge>
-                    )}
-                    {isSelected && !isCurrent && (
-                      <Badge className="text-xs bg-white text-slate-900">선택됨</Badge>
-                    )}
-                  </div>
+                  {isCurrent && <Badge className="ml-auto text-xs bg-white text-slate-900">현재</Badge>}
+                  {!isCurrent && isSelected && <Badge className="ml-auto text-xs" variant="outline">선택됨</Badge>}
                 </button>
               );
             })}
-            <div className="sticky bottom-0 -mx-1 mt-3 rounded-xl border bg-white/95 p-3 shadow-sm backdrop-blur">
-              <p className="mb-2 text-xs text-muted-foreground">
-                {statusChanged ? `저장 예정: ${currentStatusLabel} → ${selectedStatusLabel}` : `현재 상태: ${currentStatusLabel}`}
-              </p>
-              <Button type="button" className="w-full" disabled={!statusChanged || statusLoading} onClick={handleStatusSave}>
-                {statusLoading ? '저장 중...' : '상태 변경 저장'}
-              </Button>
-            </div>
+            <Button
+              className="w-full mt-2"
+              disabled={statusLoading || !selectedStatus || selectedStatus === matchState.status}
+              onClick={async () => {
+                if (!selectedStatus) return;
+                await handleStatusSave();
+                setSelectedStatus(null);
+              }}
+            >
+              {statusLoading ? '저장 중...' : '상태 저장'}
+            </Button>
           </CardContent>
         </Card>
       )}
