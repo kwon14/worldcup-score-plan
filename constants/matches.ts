@@ -126,4 +126,4 @@ export const MATCHES: Record<string, MatchConfig> = {
   },
 };
 
-export const DEFAULT_MATCH_ID = '2';
+export const DEFAULT_MATCH_ID = '1';

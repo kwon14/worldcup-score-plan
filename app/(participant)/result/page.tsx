@@ -98,7 +98,7 @@ function EmptyResultNotice({
 }
 
 export default function ResultPage() {
-  const { matchId } = useMatch();
+  const { matchId, match } = useMatch();
   const [actualResult, setActualResult] = useState<ActualResultDoc | null>(null);
   const [predictions, setPredictions] = useState<PredictionDoc[]>([]);
   const [gameStatus, setGameStatus] = useState<GameStatus>('BEFORE_MATCH');
@@ -135,7 +135,7 @@ export default function ResultPage() {
         </Button>
         <div>
           <h1 className="font-bold text-lg">최종 순위</h1>
-          <p className="text-xs text-muted-foreground">경기 종료 후 최종 결과</p>
+          <p className="text-xs text-muted-foreground">{match.label} 대한민국 vs {match.awayTeamName} 경기 종료 후 최종 결과</p>
         </div>
       </div>
 
@@ -167,7 +167,7 @@ export default function ResultPage() {
                 <span className="text-2xl text-muted-foreground">:</span>
                 <span className="text-4xl font-bold">{actualResult.mexicoScore}</span>
               </div>
-              <span className="text-2xl">🇲🇽</span>
+              <span className="text-2xl">{match.awayTeamFlag}</span>
             </div>
           </CardContent>
         </Card>
