@@ -249,7 +249,7 @@ export function LiveMatchPanel({ matchId, compact = false }: LiveMatchPanelProps
                 <div className="flex text-xs text-muted-foreground mb-1">
                   <span className="w-10" />
                   <span className="flex-1">🇰🇷 대한민국</span>
-                  <span className="flex-1 text-right">멕시코 🇲🇽</span>
+                  <span className="flex-1 text-right">{match.awayTeamName} {match.awayTeamFlag}</span>
                 </div>
                 {goalEvents.map((g) => <GoalRow key={g.id} goal={g} />)}
               </div>
@@ -265,7 +265,7 @@ export function LiveMatchPanel({ matchId, compact = false }: LiveMatchPanelProps
             <CardTitle className="text-sm flex items-center gap-2">
               🟨 카드 현황
               <span className="text-muted-foreground font-normal text-xs">
-                한국 {koreaCards.length}장 · 멕시코 {mexicoCards.length}장
+                한국 {koreaCards.length}장 · {match.awayTeamName} {mexicoCards.length}장
               </span>
             </CardTitle>
           </CardHeader>
