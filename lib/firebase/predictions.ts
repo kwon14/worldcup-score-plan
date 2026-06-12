@@ -21,7 +21,7 @@ export interface PredictionDoc {
   mvp: string;
   comment: string;
   halftimeRevised?: boolean;
-  finalMvp?: string;
+  finalMvp?: string | null;
   createdAt: unknown;
   updatedAt: unknown;
 }

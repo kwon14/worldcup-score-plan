@@ -268,7 +268,7 @@ export default function HalfTimePage() {
         halfTimeResult: myPrediction.halfTimeResult,
         cardRange,
         mvp: myPrediction.mvp,
-        finalMvp: myPrediction.finalMvp,
+        finalMvp: myPrediction.finalMvp ?? null,
         comment: myPrediction.comment,
         halftimeRevised: true,
       });

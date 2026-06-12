@@ -84,7 +84,7 @@ interface ScoringInput {
   halfTimeResult: string;
   cardRange: string;
   mvp: string;
-  finalMvp?: string;
+  finalMvp?: string | null;
 }
 
 export function computeScoreBreakdown(
