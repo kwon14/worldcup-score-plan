@@ -249,6 +249,7 @@ export default function AdminLivePage() {
   const [activeTab, setActiveTab] = useState<'status' | 'goal' | 'card'>('status');
   const [scoreInput, setScoreInput] = useState({ korea: '0', mexico: '0' });
   const [selectedStatus, setSelectedStatus] = useState<MatchStatusShort>('NS');
+  const [halfScoreInput, setHalfScoreInput] = useState({ korea: '0', mexico: '0' });
   const [statusLoading, setStatusLoading] = useState(false);
   const [officialData, setOfficialData] = useState<LiveMatchResponse | null>(null);
   const [officialMode, setOfficialMode] = useState<'summary' | 'lineups' | null>(null);
@@ -265,6 +266,10 @@ export default function AdminLivePage() {
       if (s) {
         setScoreInput({ korea: String(s.koreaScore), mexico: String(s.mexicoScore) });
         setSelectedStatus(s.status);
+        setHalfScoreInput({
+          korea: String(s.koreaHalfScore ?? 0),
+          mexico: String(s.mexicoHalfScore ?? 0),
+        });
       }
     });
     const unsubEvents = subscribeMatchEvents(matchId, setEvents);
@@ -287,6 +292,13 @@ export default function AdminLivePage() {
     await updateMatchState(matchId, {
       koreaScore: Number(scoreInput.korea),
       mexicoScore: Number(scoreInput.mexico),
+    });
+  }
+
+  async function handleHalfScoreUpdate() {
+    await updateMatchState(matchId, {
+      koreaHalfScore: Number(halfScoreInput.korea),
+      mexicoHalfScore: Number(halfScoreInput.mexico),
     });
   }
 
@@ -423,6 +435,25 @@ export default function AdminLivePage() {
               최종 경기 종료
             </Button>
           </div>
+
+          {/* 전반 스코어 수정 */}
+          {matchState.koreaHalfScore !== null && (
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs text-muted-foreground mb-2">전반 스코어 수정</p>
+              <div className="flex items-center gap-2">
+                <input type="number" min="0" max="20" value={halfScoreInput.korea}
+                  onChange={(e) => setHalfScoreInput((p) => ({ ...p, korea: e.target.value }))}
+                  className="w-12 text-center text-lg font-bold border rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-slate-400/30" />
+                <span className="text-muted-foreground font-bold">:</span>
+                <input type="number" min="0" max="20" value={halfScoreInput.mexico}
+                  onChange={(e) => setHalfScoreInput((p) => ({ ...p, mexico: e.target.value }))}
+                  className="w-12 text-center text-lg font-bold border rounded-lg py-1 focus:outline-none focus:ring-2 focus:ring-slate-400/30" />
+                <Button onClick={handleHalfScoreUpdate} variant="outline" size="sm" className="ml-auto">
+                  전반 스코어 저장
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
