@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Lock, CheckCircle2, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { MATCH_RESULT_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
+import { CARD_RANGE_OPTIONS } from '@/constants/options';
 import { KOREA_PLAYER_DATA, type PlayerData } from '@/constants/players';
 import { SCORE_WEIGHTS, GOAL_TIME_ORDER } from '@/constants/gameConfig';
 import { LiveMatchPanel } from '@/components/game/LiveMatchPanel';
@@ -28,11 +28,6 @@ const POSITION_COLOR: Record<string, string> = {
 
 const RANK_MEDAL: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
-const HALF_TIME_RESULT_LABEL: Record<string, string> = {
-  KOREA_LEAD: '대한민국 리드',
-  DRAW: '무승부',
-  MEXICO_LEAD: '멕시코 리드',
-};
 
 const FIRST_GOAL_TIME_LABEL: Record<string, string> = {
   '0_15': '0~15분', '16_30': '16~30분', '31_45': '31~45분+',
@@ -186,6 +181,13 @@ export default function HalfTimePage() {
   const [matchState, setMatchState] = useState<MatchStateDoc | null>(null);
   const [allPredictions, setAllPredictions] = useState<PredictionDoc[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const matchResultOptions = [
+    { value: 'KOREA_WIN', label: match.matchResultLabels['KOREA_WIN'] },
+    { value: 'DRAW',      label: match.matchResultLabels['DRAW'] },
+    { value: 'MEXICO_WIN', label: match.matchResultLabels['MEXICO_WIN'] },
+  ];
 
   const [matchResult, setMatchResult] = useState('');
   const [koreaScore, setKoreaScore] = useState('');
@@ -251,6 +253,7 @@ export default function HalfTimePage() {
     e.preventDefault();
     if (!myPrediction || !participantId) return;
     setSubmitting(true);
+    setSaveError(null);
     try {
       await savePrediction(matchId, participantId, {
         name: myPrediction.name,
@@ -270,6 +273,8 @@ export default function HalfTimePage() {
         halftimeRevised: true,
       });
       router.push('/');
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : '저장에 실패했어요. 다시 시도해 주세요.');
     } finally {
       setSubmitting(false);
     }
@@ -362,21 +367,21 @@ export default function HalfTimePage() {
                 <span className="text-4xl font-bold">{matchState.mexicoHalfScore}</span>
               </div>
               <div className="text-center">
-                <span className="text-2xl">🇲🇽</span>
-                <p className="text-xs text-muted-foreground mt-1">멕시코</p>
+                <span className="text-2xl">{match.awayTeamFlag}</span>
+                <p className="text-xs text-muted-foreground mt-1">{match.awayTeamName}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div className="rounded-lg bg-white border p-3">
                 <p className="text-xs text-muted-foreground mb-1">전반 결과</p>
-                <p className="font-semibold">{HALF_TIME_RESULT_LABEL[matchState.halfTimeResult ?? ''] ?? '-'}</p>
+                <p className="font-semibold">{match.halfTimeResultLabels[matchState.halfTimeResult ?? ''] ?? '-'}</p>
               </div>
               <div className="rounded-lg bg-white border p-3">
                 <p className="text-xs text-muted-foreground mb-1">첫 골 팀</p>
                 <p className="font-semibold">
                   {firstGoalOccurred
-                    ? firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : '🇲🇽 멕시코'
+                    ? (match.firstGoalTeamLabels[firstGoalTeam] ?? firstGoalTeam)
                     : '없음'}
                 </p>
               </div>
@@ -387,7 +392,7 @@ export default function HalfTimePage() {
                 </p>
               </div>
               <div className="rounded-lg bg-white border p-3">
-                <p className="text-xs text-muted-foreground mb-1">멕시코 첫 득점자</p>
+                <p className="text-xs text-muted-foreground mb-1">{match.awayTeamName} 첫 득점자</p>
                 <p className="font-semibold">{matchState.mexicoFirstScorer ?? '없음'}</p>
               </div>
             </div>
@@ -433,7 +438,7 @@ export default function HalfTimePage() {
         <CardContent>
           <RadioGroup
             name="matchResult"
-            options={MATCH_RESULT_OPTIONS}
+            options={matchResultOptions}
             value={matchResult as never}
             onChange={setMatchResult}
           />
@@ -457,7 +462,7 @@ export default function HalfTimePage() {
             </div>
             <span className="text-2xl font-bold text-muted-foreground">:</span>
             <div className="flex-1 text-center">
-              <label className="block text-xs text-muted-foreground mb-1">🇲🇽 멕시코</label>
+              <label className="block text-xs text-muted-foreground mb-1">{match.awayTeamFlag} {match.awayTeamName}</label>
               <input
                 type="number" min="0" max="20" value={mexicoScore}
                 onChange={(e) => setMexicoScore(e.target.value)}
@@ -536,7 +541,7 @@ export default function HalfTimePage() {
         <CardContent>
           <LockedOverlay
             reason={firstGoalOccurred
-              ? `전반 첫 골 팀 확정: ${firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : '🇲🇽 멕시코'}`
+              ? `전반 첫 골 팀 확정: ${match.firstGoalTeamLabels[firstGoalTeam] ?? firstGoalTeam}`
               : '전반 무득점 — 예측값 유지'
             }
           />
@@ -566,7 +571,7 @@ export default function HalfTimePage() {
         <CardContent>
           <LockedOverlay
             reason={matchState?.halfTimeResult
-              ? `전반 종료 기준 확정: ${HALF_TIME_RESULT_LABEL[matchState.halfTimeResult]}`
+              ? `전반 종료 기준 확정: ${match.halfTimeResultLabels[matchState.halfTimeResult]}`
               : '전반 결과 대기 중'
             }
           />
@@ -587,6 +592,13 @@ export default function HalfTimePage() {
           />
         </CardContent>
       </Card>
+
+      {saveError && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{saveError}</span>
+        </div>
+      )}
 
       <Button type="submit" variant="korea" size="xl" className="w-full" disabled={submitting}>
         {submitting ? '제출 중...' : '하프타임 수정 제출하기'}
