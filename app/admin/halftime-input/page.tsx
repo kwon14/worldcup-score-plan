@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Info } from 'lucide-react';
-import { FIRST_GOAL_TIME_OPTIONS, FIRST_GOAL_TEAM_OPTIONS } from '@/constants/options';
+import { FIRST_GOAL_TIME_OPTIONS } from '@/constants/options';
 import { KOREA_PLAYER_DATA } from '@/constants/players';
 import { useMatch } from '@/contexts/MatchContext';
 
@@ -96,9 +96,15 @@ export default function HalftimeInputPage() {
   const halfTimeResult =
     koreaHalf === '' || mexicoHalf === ''
       ? null
-      : koreaNum > mexicoNum ? '대한민국 리드'
-      : koreaNum < mexicoNum ? '멕시코 리드'
-      : '무승부';
+      : koreaNum > mexicoNum ? match.halfTimeResultLabels.KOREA_LEAD
+      : koreaNum < mexicoNum ? match.halfTimeResultLabels.MEXICO_LEAD
+      : match.halfTimeResultLabels.DRAW;
+
+  const firstGoalTeamOptions: { value: FirstGoalTeam; label: string }[] = [
+    { value: 'KOREA', label: match.firstGoalTeamLabels.KOREA },
+    { value: 'MEXICO', label: match.firstGoalTeamLabels.MEXICO },
+    { value: 'NONE', label: match.firstGoalTeamLabels.NONE },
+  ];
 
   const firstGoalOccurred = firstGoalTeam !== '' && firstGoalTeam !== 'NONE';
   const koreaScored = koreaNum > 0;
@@ -154,7 +160,7 @@ export default function HalftimeInputPage() {
         <div className="flex items-center gap-4">
           <ScoreInput flag="🇰🇷" label="대한민국" value={koreaHalf} onChange={setKoreaHalf} />
           <span className="text-2xl font-bold text-muted-foreground pt-5">:</span>
-          <ScoreInput flag="🇲🇽" label="멕시코" value={mexicoHalf} onChange={setMexicoHalf} />
+          <ScoreInput flag={match.awayTeamFlag} label={match.awayTeamName} value={mexicoHalf} onChange={setMexicoHalf} />
         </div>
         {halfTimeResult && (
           <div className="mt-3 text-center">
@@ -169,7 +175,7 @@ export default function HalftimeInputPage() {
       <SectionCard title="첫 골 팀">
         <RadioGroup
           name="firstGoalTeam"
-          options={FIRST_GOAL_TEAM_OPTIONS}
+          options={firstGoalTeamOptions}
           value={firstGoalTeam}
           onChange={setFirstGoalTeam}
         />
@@ -203,9 +209,9 @@ export default function HalftimeInputPage() {
         </SectionCard>
       )}
 
-      {/* 멕시코 전반 첫 득점자 (멕시코 득점 시만) */}
+      {/* 어웨이팀 전반 첫 득점자 (어웨이팀 득점 시만) */}
       {mexicoScored && (
-        <SectionCard title="🇲🇽 멕시코 전반 첫 득점자">
+        <SectionCard title={`${match.awayTeamFlag} ${match.awayTeamName} 전반 첫 득점자`}>
           <select
             value={mexicoFirstScorer}
             onChange={(e) => setMexicoFirstScorer(e.target.value)}
@@ -237,10 +243,10 @@ export default function HalftimeInputPage() {
             <Info className="h-4 w-4 shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold mb-1">저장 전 확인해주세요</p>
-              <p>🇰🇷 {koreaHalf} : {mexicoHalf} 🇲🇽 · 전반 결과: {halfTimeResult}</p>
-              <p>첫 골: {firstGoalTeam === 'KOREA' ? '대한민국' : firstGoalTeam === 'MEXICO' ? '멕시코' : '없음'} {firstGoalTime && `(${firstGoalTime})`}</p>
+              <p>🇰🇷 {koreaHalf} : {mexicoHalf} {match.awayTeamFlag} · 전반 결과: {halfTimeResult}</p>
+              <p>첫 골: {firstGoalTeam === 'KOREA' ? match.firstGoalTeamLabels.KOREA : firstGoalTeam === 'MEXICO' ? match.firstGoalTeamLabels.MEXICO : match.firstGoalTeamLabels.NONE} {firstGoalTime && `(${firstGoalTime})`}</p>
               {koreaScored && <p>🇰🇷 첫 득점자: {koreaFirstScorer}</p>}
-              {mexicoScored && <p>🇲🇽 첫 득점자: {mexicoFirstScorer}</p>}
+              {mexicoScored && <p>{match.awayTeamFlag} 첫 득점자: {mexicoFirstScorer}</p>}
             </div>
           </div>
           <div className="flex gap-2">

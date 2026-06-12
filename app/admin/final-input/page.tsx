@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ChevronLeft, Info } from 'lucide-react';
-import { FIRST_GOAL_TIME_OPTIONS, FIRST_GOAL_TEAM_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
+import { FIRST_GOAL_TIME_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
 import { KOREA_PLAYER_DATA } from '@/constants/players';
 import { useMatch } from '@/contexts/MatchContext';
 
@@ -85,9 +85,15 @@ export default function FinalInputPage() {
 
   const matchResultLabel =
     koreaFinal === '' || mexicoFinal === '' ? null
-    : koreaNum > mexicoNum ? '대한민국 승'
-    : koreaNum < mexicoNum ? '멕시코 승'
-    : '무승부';
+    : koreaNum > mexicoNum ? match.matchResultLabels.KOREA_WIN
+    : koreaNum < mexicoNum ? match.matchResultLabels.MEXICO_WIN
+    : match.matchResultLabels.DRAW;
+
+  const firstGoalTeamOptions: { value: FirstGoalTeam; label: string }[] = [
+    { value: 'KOREA', label: match.firstGoalTeamLabels.KOREA },
+    { value: 'MEXICO', label: match.firstGoalTeamLabels.MEXICO },
+    { value: 'NONE', label: match.firstGoalTeamLabels.NONE },
+  ];
 
   const CARD_RANGE_LABEL: Record<string, string> = {
     '0_2': '0~2장', '3_5': '3~5장', '6_PLUS': '6장 이상',
@@ -181,7 +187,7 @@ export default function FinalInputPage() {
       <SectionCard title="첫 골 팀">
         <RadioGroup
           name="firstGoalTeam"
-          options={FIRST_GOAL_TEAM_OPTIONS}
+          options={firstGoalTeamOptions}
           value={firstGoalTeam as never}
           onChange={setFirstGoalTeam}
         />
