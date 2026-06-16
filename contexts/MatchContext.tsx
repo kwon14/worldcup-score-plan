@@ -5,7 +5,7 @@ import { MATCHES, DEFAULT_MATCH_ID, type MatchConfig } from '@/constants/matches
 
 const STORAGE_KEY = 'wc_match_id';
 const STORAGE_VERSION_KEY = 'wc_match_id_version';
-const STORAGE_VERSION = '2026-06-czech-default';
+const STORAGE_VERSION = '2026-06-mexico-default';
 
 interface MatchContextValue {
   matchId: string;
