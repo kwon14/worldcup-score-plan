@@ -84,7 +84,7 @@ export const MATCHES: Record<string, MatchConfig> = {
     label: '2차전',
     awayTeamName: '멕시코',
     awayTeamFlag: '🇲🇽',
-    date: '2026년 6월 19일 (KST)',
+    date: '2026년 6월 19일 11:00 (KST)',
     localDate: '현지: 6월 18일 21:00 (CDT)',
     venue: '에스타디오 아크론, 과달라하라',
     awayPlayerData: MEXICO_PLAYER_DATA,
