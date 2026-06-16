@@ -248,6 +248,7 @@ export default function AdminLivePage() {
   const [events, setEvents] = useState<MatchEventDoc[]>([]);
   const [activeTab, setActiveTab] = useState<'status' | 'goal' | 'card'>('status');
   const [scoreInput, setScoreInput] = useState({ korea: '0', mexico: '0' });
+  const [selectedStatus, setSelectedStatus] = useState<MatchStatusShort>('NS');
   const [statusLoading, setStatusLoading] = useState(false);
   const [officialData, setOfficialData] = useState<LiveMatchResponse | null>(null);
   const [officialMode, setOfficialMode] = useState<'summary' | 'lineups' | null>(null);
@@ -261,16 +262,20 @@ export default function AdminLivePage() {
 
     const unsubState = subscribeMatchState(matchId, (s) => {
       setMatchState(s);
-      if (s) setScoreInput({ korea: String(s.koreaScore), mexico: String(s.mexicoScore) });
+      if (s) {
+        setScoreInput({ korea: String(s.koreaScore), mexico: String(s.mexicoScore) });
+        setSelectedStatus(s.status);
+      }
     });
     const unsubEvents = subscribeMatchEvents(matchId, setEvents);
     return () => { unsubState(); unsubEvents(); };
   }, [matchId]);
 
-  async function handleStatusChange(status: MatchStatusShort) {
+  async function handleStatusSave() {
+    if (!matchState || selectedStatus === matchState.status) return;
     setStatusLoading(true);
-    const payload: Partial<Omit<MatchStateDoc, 'updatedAt'>> = { status };
-    if (status === 'HT' && matchState) {
+    const payload: Partial<Omit<MatchStateDoc, 'updatedAt'>> = { status: selectedStatus };
+    if (selectedStatus === 'HT') {
       payload.koreaHalfScore = matchState.koreaScore;
       payload.mexicoHalfScore = matchState.mexicoScore;
     }
@@ -371,6 +376,8 @@ export default function AdminLivePage() {
   }
 
   const currentStatusLabel = STATUS_FLOW.find((s) => s.status === matchState.status)?.label ?? matchState.status;
+  const selectedStatusLabel = STATUS_FLOW.find((s) => s.status === selectedStatus)?.label ?? selectedStatus;
+  const statusChanged = selectedStatus !== matchState.status;
 
   return (
     <div className="space-y-4">
@@ -479,21 +486,38 @@ export default function AdminLivePage() {
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">경기 진행 상태 변경</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            {STATUS_FLOW.map((s) => (
-              <button key={s.status} type="button" disabled={statusLoading}
-                onClick={() => handleStatusChange(s.status)}
-                className={`w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-                  matchState.status === s.status
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-border hover:bg-muted/50'
-                }`}>
-                <span className={`h-2.5 w-2.5 rounded-full ${s.color} shrink-0`} />
-                <span className="text-sm font-medium">{s.label}</span>
-                {matchState.status === s.status && (
-                  <Badge className="ml-auto text-xs bg-white text-slate-900">현재</Badge>
-                )}
-              </button>
-            ))}
+            {STATUS_FLOW.map((s) => {
+              const isCurrent = matchState.status === s.status;
+              const isSelected = selectedStatus === s.status;
+              return (
+                <button key={s.status} type="button" disabled={statusLoading}
+                  onClick={() => setSelectedStatus(s.status)}
+                  className={`w-full flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+                    isSelected
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : 'border-border hover:bg-muted/50'
+                  }`}>
+                  <span className={`h-2.5 w-2.5 rounded-full ${s.color} shrink-0`} />
+                  <span className="text-sm font-medium">{s.label}</span>
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {isCurrent && (
+                      <Badge className={`text-xs ${isSelected ? 'bg-white text-slate-900' : ''}`}>현재</Badge>
+                    )}
+                    {isSelected && !isCurrent && (
+                      <Badge className="text-xs bg-white text-slate-900">선택됨</Badge>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+            <div className="sticky bottom-0 -mx-1 mt-3 rounded-xl border bg-white/95 p-3 shadow-sm backdrop-blur">
+              <p className="mb-2 text-xs text-muted-foreground">
+                {statusChanged ? `저장 예정: ${currentStatusLabel} → ${selectedStatusLabel}` : `현재 상태: ${currentStatusLabel}`}
+              </p>
+              <Button type="button" className="w-full" disabled={!statusChanged || statusLoading} onClick={handleStatusSave}>
+                {statusLoading ? '저장 중...' : '상태 변경 저장'}
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
