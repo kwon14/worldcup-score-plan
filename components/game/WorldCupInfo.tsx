@@ -169,7 +169,7 @@ export function WorldCupInfo() {
               <p className="text-xs text-muted-foreground">{match.localDate}</p>
               <p className="text-xs font-medium text-korea-red">{match.date}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                📺 SBS · MBC · KBS 생중계 예정
+                📺 JTBC · KBS 생중계 예정
               </p>
             </div>
           </div>
