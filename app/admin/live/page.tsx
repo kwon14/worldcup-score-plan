@@ -22,9 +22,9 @@ import { KOREA_PLAYER_DATA } from '@/constants/players';
 
 const STATUS_FLOW: { status: MatchStatusShort; label: string; color: string }[] = [
   { status: 'NS',  label: '경기 전',   color: 'bg-slate-500' },
-  { status: '1H',  label: '전반 시작', color: 'bg-blue-500' },
+  { status: '1H',  label: '전반 진행 중', color: 'bg-blue-500' },
   { status: 'HT',  label: '하프타임', color: 'bg-yellow-500' },
-  { status: '2H',  label: '후반 시작', color: 'bg-orange-500' },
+  { status: '2H',  label: '후반 진행 중', color: 'bg-orange-500' },
   { status: 'FT',  label: '경기 종료', color: 'bg-red-600' },
 ];
 
