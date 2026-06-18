@@ -248,7 +248,7 @@ export default function AdminLivePage() {
   const [events, setEvents] = useState<MatchEventDoc[]>([]);
   const [activeTab, setActiveTab] = useState<'status' | 'goal' | 'card'>('status');
   const [scoreInput, setScoreInput] = useState({ korea: '0', mexico: '0' });
-  const [selectedStatus, setSelectedStatus] = useState<MatchStatusShort>('NS');
+  const [selectedStatus, setSelectedStatus] = useState<MatchStatusShort | null>(null);
   const [halfScoreInput, setHalfScoreInput] = useState({ korea: '0', mexico: '0' });
   const [statusLoading, setStatusLoading] = useState(false);
   const [officialData, setOfficialData] = useState<LiveMatchResponse | null>(null);
@@ -277,9 +277,9 @@ export default function AdminLivePage() {
   }, [matchId]);
 
   async function handleStatusSave() {
-    if (!matchState || selectedStatus === matchState.status) return;
+    if (!matchState || !selectedStatus || selectedStatus === matchState.status) return;
     setStatusLoading(true);
-    const payload: Partial<Omit<MatchStateDoc, 'updatedAt'>> = { status: selectedStatus };
+    const payload: Partial<Omit<MatchStateDoc, 'updatedAt'>> = { status: selectedStatus! };
     if (selectedStatus === 'HT') {
       payload.koreaHalfScore = matchState.koreaScore;
       payload.mexicoHalfScore = matchState.mexicoScore;
