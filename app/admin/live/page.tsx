@@ -251,7 +251,6 @@ export default function AdminLivePage() {
   const [selectedStatus, setSelectedStatus] = useState<MatchStatusShort>('NS');
   const [halfScoreInput, setHalfScoreInput] = useState({ korea: '0', mexico: '0' });
   const [statusLoading, setStatusLoading] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<MatchStatusShort | null>(null);
   const [officialData, setOfficialData] = useState<LiveMatchResponse | null>(null);
   const [officialMode, setOfficialMode] = useState<'summary' | 'lineups' | null>(null);
   const [officialLoading, setOfficialLoading] = useState(false);
