@@ -1,6 +1,20 @@
-import assert from 'node:assert/strict';
-import { EMPLOYEE_ALLOWLIST } from '../lib/auth/allowlist';
-import { findAllowedEmployee, mapEmployeeRole, normalizePhone, isAdminRole } from '../lib/auth/employeeIdentity';
+const assert = require('node:assert/strict');
+
+process.env.EMPLOYEE_ALLOWLIST_JSON ??= JSON.stringify([
+  { name: '권오균', employeeId: '1113677', phone: '01094074295', role: '관리자' },
+  { name: '이상화', employeeId: '1113492', phone: '01055867146', role: '운영자' },
+  { name: '신종필', employeeId: '1110556', phone: '01020154232', role: '일반' },
+  { name: '테스트1', employeeId: 'test1', phone: '01000000001', role: '일반' },
+  { name: '테스트2', employeeId: 'test2', phone: '01000000002', role: '일반' },
+  { name: '테스트3', employeeId: 'test3', phone: '01000000003', role: '일반' },
+  { name: '테스트4', employeeId: 'test4', phone: '01000000004', role: '일반' },
+  { name: '테스트5', employeeId: 'test5', phone: '01000000005', role: '일반' },
+  { name: '테스트6', employeeId: 'test6', phone: '01000000006', role: '일반' },
+  { name: '테스트7', employeeId: 'test7', phone: '01000000007', role: '일반' },
+]);
+
+const { EMPLOYEE_ALLOWLIST } = require('../lib/auth/allowlist');
+const { findAllowedEmployee, mapEmployeeRole, normalizePhone, isAdminRole } = require('../lib/auth/employeeIdentity');
 
 function run() {
   assert.equal(EMPLOYEE_ALLOWLIST.length, 10, '제공된 직원 10명이 allowlist에 있어야 합니다');
