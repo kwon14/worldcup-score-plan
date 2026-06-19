@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMatch } from '@/contexts/MatchContext';
+import { GROUP_A_RESULTS, GROUP_A_RESULTS_UPDATED_AT, GROUP_A_STANDINGS } from '@/constants/groupStage';
 
 const GROUP_A_TEAMS = [
   { flag: '🇲🇽', name: '멕시코', extra: '개최국' },
@@ -76,6 +77,58 @@ export function WorldCupInfo() {
               </div>
             </div>
           ))}
+        </CardContent>
+      </Card>
+
+      {/* 현재 조별예선 결과 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center justify-between gap-2">
+            <span>📊 현재 조별예선 결과</span>
+            <span className="text-[10px] font-normal text-muted-foreground">A조</span>
+          </CardTitle>
+          <p className="text-[11px] text-muted-foreground">{GROUP_A_RESULTS_UPDATED_AT}</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="overflow-hidden rounded-lg border">
+            <div className="grid grid-cols-[2rem_1fr_2rem_2rem_2rem_2.5rem] bg-slate-50 px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">
+              <span>순위</span>
+              <span>팀</span>
+              <span className="text-center">경기</span>
+              <span className="text-center">득실</span>
+              <span className="text-center">승점</span>
+              <span className="text-right">전적</span>
+            </div>
+            {GROUP_A_STANDINGS.map((team) => {
+              const goalDiff = team.goalsFor - team.goalsAgainst;
+              return (
+                <div key={team.name} className="grid grid-cols-[2rem_1fr_2rem_2rem_2rem_2.5rem] items-center border-t px-2 py-2 text-xs">
+                  <span className="font-bold text-muted-foreground">{team.rank}</span>
+                  <span className="font-semibold truncate">{team.flag} {team.name}</span>
+                  <span className="text-center text-muted-foreground">{team.played}</span>
+                  <span className="text-center text-muted-foreground">{goalDiff > 0 ? `+${goalDiff}` : goalDiff}</span>
+                  <span className="text-center font-bold text-korea-red">{team.points}</span>
+                  <span className="text-right text-[11px] text-muted-foreground">{team.win}승{team.draw}무{team.loss}패</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="space-y-1.5">
+            {GROUP_A_RESULTS.map((result) => (
+              <div key={`${result.date}-${result.homeTeam}-${result.awayTeam}`} className="flex items-center gap-2 rounded-lg bg-muted/40 px-2.5 py-2 text-xs">
+                <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${result.status === '종료' ? 'bg-slate-200 text-slate-700' : 'bg-blue-100 text-blue-700'}`}>
+                  {result.status}
+                </span>
+                <span className="w-12 text-[11px] text-muted-foreground">{result.date}</span>
+                <span className="flex-1 truncate text-right font-medium">{result.homeFlag} {result.homeTeam}</span>
+                <span className="w-12 text-center font-bold">
+                  {result.status === '종료' ? `${result.homeScore}-${result.awayScore}` : 'vs'}
+                </span>
+                <span className="flex-1 truncate font-medium">{result.awayFlag} {result.awayTeam}</span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
