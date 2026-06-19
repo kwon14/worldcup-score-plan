@@ -67,6 +67,7 @@ export default function FinalInputPage() {
   const [cardRange, setCardRange] = useState('');
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [matchStateData, setMatchStateData] = useState<MatchStateDoc | null>(null);
 
   useEffect(() => {
@@ -75,6 +76,10 @@ export default function FinalInputPage() {
       if (state) {
         setKoreaFinal(String(state.koreaScore));
         setMexicoFinal(String(state.mexicoScore));
+        if (state.firstGoalTeam) setFirstGoalTeam(state.firstGoalTeam);
+        if (state.firstGoalTimeRange) setFirstGoalTime(state.firstGoalTimeRange);
+        if (state.koreaFirstScorer) setKoreaFirstScorer(state.koreaFirstScorer);
+        if (state.mexicoFirstScorer) setMexicoFirstScorer(state.mexicoFirstScorer);
       }
     });
   }, [matchId]);
@@ -104,17 +109,23 @@ export default function FinalInputPage() {
     '46_60': '46~60분', '61_75': '61~75분', '76_90': '76~90분+', 'NONE': '없음',
   };
 
+  const effectiveFirstGoalTeam = totalGoals === 0 ? 'NONE' : firstGoalTeam;
+  const effectiveFirstGoalTime = totalGoals === 0 ? 'NONE' : firstGoalTime;
+  const effectiveKoreaFirstScorer = koreaFinal !== '' && koreaNum === 0 ? '없음' : koreaFirstScorer;
+  const effectiveMexicoFirstScorer = mexicoFinal !== '' && mexicoNum === 0 ? '없음' : mexicoFirstScorer;
+
   const isValid =
     koreaFinal !== '' &&
     mexicoFinal !== '' &&
-    firstGoalTeam !== '' &&
-    firstGoalTime !== '' &&
-    koreaFirstScorer !== '' &&
-    mexicoFirstScorer !== '' &&
+    effectiveFirstGoalTeam !== '' &&
+    effectiveFirstGoalTime !== '' &&
+    effectiveKoreaFirstScorer !== '' &&
+    effectiveMexicoFirstScorer !== '' &&
     cardRange !== '';
 
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
+    setSaveError(null);
     if (!isValid) return;
     if (!showConfirm) { setShowConfirm(true); return; }
     setSubmitting(true);
@@ -128,9 +139,9 @@ export default function FinalInputPage() {
         koreaScore: koreaNum,
         mexicoScore: mexicoNum,
         totalGoals: koreaNum + mexicoNum,
-        koreaFirstScorer,
-        firstGoalTeam: firstGoalTeam as FirstGoalTeam,
-        firstGoalTimeRange: firstGoalTime as FirstGoalTimeRange,
+        koreaFirstScorer: effectiveKoreaFirstScorer,
+        firstGoalTeam: effectiveFirstGoalTeam as FirstGoalTeam,
+        firstGoalTimeRange: effectiveFirstGoalTime as FirstGoalTimeRange,
         halfTimeResult: halfTimeResultCode,
         cardRange: cardRange as CardRange,
       });
@@ -138,6 +149,7 @@ export default function FinalInputPage() {
       router.push('/admin');
     } catch (err) {
       console.error(err);
+      setSaveError(err instanceof Error ? err.message : '최종 결과 저장에 실패했습니다. 잠시 후 다시 시도해주세요.');
       setSubmitting(false);
     }
   }
@@ -205,30 +217,38 @@ export default function FinalInputPage() {
 
       {/* 대한민국 첫 득점자 */}
       <SectionCard title="🇰🇷 대한민국 첫 득점자">
-        <select
-          value={koreaFirstScorer}
-          onChange={(e) => setKoreaFirstScorer(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
-        >
-          <option value="">선택하세요</option>
-          {KOREA_PLAYER_DATA.map((p) => (
-            <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
-          ))}
-        </select>
+        {koreaFinal !== '' && koreaNum === 0 ? (
+          <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">대한민국 무득점으로 자동 처리됩니다.</p>
+        ) : (
+          <select
+            value={koreaFirstScorer}
+            onChange={(e) => setKoreaFirstScorer(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
+          >
+            <option value="">선택하세요</option>
+            {KOREA_PLAYER_DATA.map((p) => (
+              <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
+            ))}
+          </select>
+        )}
       </SectionCard>
 
       {/* 어웨이팀 첫 득점자 */}
       <SectionCard title={`${match.awayTeamFlag} ${match.awayTeamName} 첫 득점자`}>
-        <select
-          value={mexicoFirstScorer}
-          onChange={(e) => setMexicoFirstScorer(e.target.value)}
-          className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
-        >
-          <option value="">선택하세요</option>
-          {match.awayPlayerData.map((p) => (
-            <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
-          ))}
-        </select>
+        {mexicoFinal !== '' && mexicoNum === 0 ? (
+          <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">{match.awayTeamName} 무득점으로 자동 처리됩니다.</p>
+        ) : (
+          <select
+            value={mexicoFirstScorer}
+            onChange={(e) => setMexicoFirstScorer(e.target.value)}
+            className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-korea-red/30"
+          >
+            <option value="">선택하세요</option>
+            {match.awayPlayerData.map((p) => (
+              <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
+            ))}
+          </select>
+        )}
       </SectionCard>
 
       {/* 카드 수 */}
@@ -242,6 +262,12 @@ export default function FinalInputPage() {
       </SectionCard>
 
       {/* 확인 단계 */}
+      {saveError && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          저장 실패: {saveError}
+        </div>
+      )}
+
       {showConfirm && (
         <div className="rounded-xl border-2 border-red-400 bg-red-50 p-4 space-y-3">
           <div className="flex items-start gap-2 text-sm text-red-800">
@@ -249,8 +275,8 @@ export default function FinalInputPage() {
             <div className="space-y-1">
               <p className="font-semibold">저장 전 최종 확인</p>
               <p>🏆 최종 스코어: 대한민국 {koreaFinal} : {mexicoFinal} {match.awayTeamName}</p>
-              <p>⚽ 첫 골: {firstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : firstGoalTeam === 'MEXICO' ? `${match.awayTeamFlag} ${match.awayTeamName}` : '없음'} {firstGoalTime && `· ${FIRST_GOAL_TIME_LABEL[firstGoalTime]}`}</p>
-              <p>🇰🇷 한국 첫 득점자: {koreaFirstScorer} · {match.awayTeamFlag} {match.awayTeamName}: {mexicoFirstScorer}</p>
+              <p>⚽ 첫 골: {effectiveFirstGoalTeam === 'KOREA' ? '🇰🇷 대한민국' : effectiveFirstGoalTeam === 'MEXICO' ? `${match.awayTeamFlag} ${match.awayTeamName}` : '없음'} {effectiveFirstGoalTime && `· ${FIRST_GOAL_TIME_LABEL[effectiveFirstGoalTime]}`}</p>
+              <p>🇰🇷 한국 첫 득점자: {effectiveKoreaFirstScorer} · {match.awayTeamFlag} {match.awayTeamName}: {effectiveMexicoFirstScorer}</p>
               <p>🟨 카드: {CARD_RANGE_LABEL[cardRange]}</p>
               <p className="font-semibold text-red-700 mt-1">저장하면 전체 점수가 자동 계산됩니다.</p>
             </div>
