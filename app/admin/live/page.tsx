@@ -17,6 +17,7 @@ import type { MatchStateDoc, MatchEventDoc } from '@/lib/firebase/matchState';
 import { app } from '@/lib/firebase/config';
 import { useMatch } from '@/contexts/MatchContext';
 import { KOREA_PLAYER_DATA } from '@/constants/players';
+import { buildLineupPlayerOptions } from '@/lib/lineups/playerOptions';
 
 // ── 상수 ─────────────────────────────────────────────────────────────────────
 
@@ -65,9 +66,9 @@ function officialCards(live: LiveMatchResponse): CardEvent[] {
 // ── GoalForm ──────────────────────────────────────────────────────────────────
 
 function GoalForm({
-  matchId, awayPlayers, awayTeamFlag, awayTeamName,
+  matchId, koreaPlayers, awayPlayers, awayTeamFlag, awayTeamName,
 }: {
-  matchId: string; awayPlayers: string[]; awayTeamFlag: string; awayTeamName: string;
+  matchId: string; koreaPlayers: string[]; awayPlayers: string[]; awayTeamFlag: string; awayTeamName: string;
 }) {
   const [team, setTeam] = useState<'KOREA' | 'MEXICO'>('KOREA');
   const [minute, setMinute] = useState('');
@@ -77,7 +78,7 @@ function GoalForm({
   const [type, setType] = useState<'normal' | 'penalty' | 'own_goal'>('normal');
   const [loading, setLoading] = useState(false);
 
-  const players = team === 'KOREA' ? KOREA_PLAYERS : awayPlayers;
+  const players = team === 'KOREA' ? koreaPlayers : awayPlayers;
   const finalScorer = scorer === '직접 입력' ? customScorer : scorer;
 
   async function handleAdd() {
@@ -159,9 +160,9 @@ function GoalForm({
 // ── CardForm ──────────────────────────────────────────────────────────────────
 
 function CardForm({
-  matchId, awayPlayers, awayTeamFlag, awayTeamName,
+  matchId, koreaPlayers, awayPlayers, awayTeamFlag, awayTeamName,
 }: {
-  matchId: string; awayPlayers: string[]; awayTeamFlag: string; awayTeamName: string;
+  matchId: string; koreaPlayers: string[]; awayPlayers: string[]; awayTeamFlag: string; awayTeamName: string;
 }) {
   const [team, setTeam] = useState<'KOREA' | 'MEXICO'>('KOREA');
   const [minute, setMinute] = useState('');
@@ -170,7 +171,7 @@ function CardForm({
   const [cardType, setCardType] = useState<'yellow' | 'red' | 'yellow_red'>('yellow');
   const [loading, setLoading] = useState(false);
 
-  const players = team === 'KOREA' ? KOREA_PLAYERS : awayPlayers;
+  const players = team === 'KOREA' ? koreaPlayers : awayPlayers;
   const finalPlayer = player === '직접 입력' ? customPlayer : player;
 
   async function handleAdd() {
@@ -256,7 +257,12 @@ export default function AdminLivePage() {
   const [officialLoading, setOfficialLoading] = useState(false);
   const [officialError, setOfficialError] = useState<string | null>(null);
 
-  const awayPlayers = [...match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => p.name), '직접 입력'];
+  const fallbackAwayPlayers = [...match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => p.name), '직접 입력'];
+  const { koreaPlayers, awayPlayers } = buildLineupPlayerOptions({
+    lineups: officialMode === 'lineups' ? officialData?.lineups ?? [] : [],
+    fallbackKoreaPlayers: KOREA_PLAYERS,
+    fallbackAwayPlayers,
+  });
 
   useEffect(() => {
     initMatchState(matchId);
@@ -348,6 +354,17 @@ export default function AdminLivePage() {
     try {
       const data = await requestOfficialData(mode);
       setOfficialData(data);
+      if (mode === 'lineups') {
+        const lineupOptions = buildLineupPlayerOptions({
+          lineups: data.lineups,
+          fallbackKoreaPlayers: KOREA_PLAYERS,
+          fallbackAwayPlayers,
+        });
+        await updateMatchState(matchId, {
+          koreaLineupPlayers: lineupOptions.koreaPlayers.filter((name) => name !== '직접 입력'),
+          awayLineupPlayers: lineupOptions.awayPlayers.filter((name) => name !== '직접 입력'),
+        });
+      }
     } catch (err) {
       setOfficialData(null);
       setOfficialError(err instanceof Error ? err.message : '공식 API 조회에 실패했어요.');
@@ -487,7 +504,9 @@ export default function AdminLivePage() {
                 <p className="text-muted-foreground">득점 {officialData.goals.length}개 · 카드 {officialData.cards.length}개</p>
               )}
               {officialMode === 'lineups' && (
-                <p className="text-muted-foreground">라인업 {officialData.lineups.length}팀 조회됨</p>
+                <p className="text-muted-foreground">
+                  라인업 {officialData.lineups.length}팀 조회됨 · 득점/카드 입력 선수 목록에 전체 명단 반영
+                </p>
               )}
               {officialMode === 'summary' && (
                 <Button type="button" size="sm" className="w-full" disabled={officialLoading} onClick={applyOfficialData}>
@@ -559,6 +578,7 @@ export default function AdminLivePage() {
             <CardContent>
               <GoalForm
                 matchId={matchId}
+                koreaPlayers={koreaPlayers}
                 awayPlayers={awayPlayers}
                 awayTeamFlag={match.awayTeamFlag}
                 awayTeamName={match.awayTeamName}
@@ -608,6 +628,7 @@ export default function AdminLivePage() {
             <CardContent>
               <CardForm
                 matchId={matchId}
+                koreaPlayers={koreaPlayers}
                 awayPlayers={awayPlayers}
                 awayTeamFlag={match.awayTeamFlag}
                 awayTeamName={match.awayTeamName}

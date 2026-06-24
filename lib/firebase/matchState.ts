@@ -20,6 +20,8 @@ export interface MatchStateDoc {
   firstGoalTimeRange?: string;
   koreaFirstScorer?: string;
   mexicoFirstScorer?: string;
+  koreaLineupPlayers?: string[];
+  awayLineupPlayers?: string[];
   updatedAt: unknown;
 }
 

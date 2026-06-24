@@ -10,8 +10,10 @@ import Link from 'next/link';
 import { savePrediction } from '@/lib/firebase/predictions';
 import { getOrCreateParticipantUser, useParticipantAuth } from '@/lib/firebase/auth';
 import { subscribeGameStatus } from '@/lib/firebase/gameStatus';
+import { subscribeMatchState, type MatchStateDoc } from '@/lib/firebase/matchState';
 import { FIRST_GOAL_TIME_OPTIONS, CARD_RANGE_OPTIONS } from '@/constants/options';
 import { KOREA_PLAYER_DATA, type PlayerData } from '@/constants/players';
+import { buildPredictionPlayerData } from '@/lib/lineups/playerOptions';
 import { SCORE_WEIGHTS } from '@/constants/gameConfig';
 import { useMatch } from '@/contexts/MatchContext';
 import type { GameStatus } from '@/types/game';
@@ -129,9 +131,12 @@ export default function PredictPage() {
   const { matchId, match } = useMatch();
   const { status: authStatus, claims } = useParticipantAuth();
   const [gameStatus, setGameStatus] = useState<GameStatus>('BEFORE_MATCH');
+  const [matchState, setMatchState] = useState<MatchStateDoc | null>(null);
 
   useEffect(() => {
-    return subscribeGameStatus(matchId, setGameStatus);
+    const unsubStatus = subscribeGameStatus(matchId, setGameStatus);
+    const unsubState = subscribeMatchState(matchId, setMatchState);
+    return () => { unsubStatus(); unsubState(); };
   }, [matchId]);
 
   const [matchResult, setMatchResult] = useState('');
@@ -163,6 +168,8 @@ export default function PredictPage() {
   ];
 
   const totalGoals = koreaScore !== '' && mexicoScore !== '' ? Number(koreaScore) + Number(mexicoScore) : null;
+  const koreaScorerPlayers = buildPredictionPlayerData(matchState?.koreaLineupPlayers, KOREA_PLAYER_DATA);
+  const awayScorerPlayers = buildPredictionPlayerData(matchState?.awayLineupPlayers, match.awayPlayerData);
 
   const isValid = authStatus === 'signed-in' && !!claims?.name && matchResult && koreaScore !== '' && mexicoScore !== '' &&
     koreaFirstScorer && mexicoFirstScorer && firstGoalTeam && firstGoalTimeRange &&
@@ -294,7 +301,7 @@ export default function PredictPage() {
         </CardHeader>
         <CardContent>
           <PlayerSelector
-            name="koreaFirstScorer" players={KOREA_PLAYER_DATA} value={koreaFirstScorer}
+            name="koreaFirstScorer" players={koreaScorerPlayers} value={koreaFirstScorer}
             onChange={setKoreaFirstScorer} accentColor="korea-red" noneLabel="없음 (대한민국 무득점)"
           />
         </CardContent>
@@ -307,7 +314,7 @@ export default function PredictPage() {
         </CardHeader>
         <CardContent>
           <PlayerSelector
-            name="mexicoFirstScorer" players={match.awayPlayerData} value={mexicoFirstScorer}
+            name="mexicoFirstScorer" players={awayScorerPlayers} value={mexicoFirstScorer}
             onChange={setMexicoFirstScorer} accentColor="green-600"
             noneLabel={`없음 (${match.awayTeamName} 무득점)`}
           />
@@ -364,12 +371,12 @@ export default function PredictPage() {
           >
             <option value="">선택하세요</option>
             <optgroup label="🇰🇷 대한민국">
-              {KOREA_PLAYER_DATA.filter((p) => p.name !== '없음').map((p) => (
+              {koreaScorerPlayers.filter((p) => p.name !== '없음').map((p) => (
                 <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
               ))}
             </optgroup>
             <optgroup label={`${match.awayTeamFlag} ${match.awayTeamName}`}>
-              {match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => (
+              {awayScorerPlayers.filter((p) => p.name !== '없음').map((p) => (
                 <option key={p.name} value={p.name}>{p.name} ({p.position})</option>
               ))}
             </optgroup>
