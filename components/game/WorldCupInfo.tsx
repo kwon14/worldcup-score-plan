@@ -6,15 +6,15 @@ import { GROUP_A_RESULTS, GROUP_A_RESULTS_UPDATED_AT, GROUP_A_STANDINGS } from '
 
 const GROUP_A_TEAMS = [
   { flag: '🇲🇽', name: '멕시코', extra: '개최국' },
-  { flag: '🇰🇷', name: '대한민국', extra: 'FIFA 26위' },
-  { flag: '🇿🇦', name: '남아프리카공화국', extra: 'FIFA 68위' },
+  { flag: '🇰🇷', name: '대한민국', extra: 'FIFA 25위' },
+  { flag: '🇿🇦', name: '남아프리카공화국', extra: 'FIFA 60위' },
   { flag: '🇨🇿', name: '체코', extra: 'FIFA 40위' },
 ];
 
 const KOREA_INFO = {
   flag: '🇰🇷',
   name: '대한민국',
-  rank: 'FIFA 26위',
+  rank: 'FIFA 25위',
   coach: '홍명보',
   keyPlayers: ['손흥민 (LA FC)', '김민재 (바이에른)', '이강인 (PSG)'],
   borderClass: 'border-t-korea-red',

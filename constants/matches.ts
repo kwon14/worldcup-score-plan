@@ -134,7 +134,7 @@ export const MATCHES: Record<string, MatchConfig> = {
     venue: '에스타디오 BBVA, 과달루페',
     awayPlayerData: SOUTH_AFRICA_PLAYER_DATA,
     awayTeamInfo: {
-      rank: 'FIFA 56위',
+      rank: 'FIFA 60위',
       coach: 'H. 브루스',
       keyPlayers: ['P. 타우', 'L. 포스터 (번리)', 'T. 즈와네'],
       borderClass: 'border-t-yellow-500',
