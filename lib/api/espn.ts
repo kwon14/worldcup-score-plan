@@ -6,11 +6,13 @@ const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/soccer/FIFA.WOR
 const ESPN_FIXTURE_IDS: Record<string, number> = {
   '1': 760414, // 한국 vs 체코  (2026-06-12 KST)
   '2': 760441, // 한국 vs 멕시코 (2026-06-19 KST)
+  '3': 760466, // 남아공 vs 한국 (2026-06-25 KST)
 };
 
 const FALLBACK_TEAMS: Record<string, { homeTeam: string; awayTeam: string }> = {
   '1': { homeTeam: '대한민국', awayTeam: '체코' },
   '2': { homeTeam: '대한민국', awayTeam: '멕시코' },
+  '3': { homeTeam: '남아공', awayTeam: '대한민국' },
 };
 
 function getFixtureId(matchId: string): number | null {

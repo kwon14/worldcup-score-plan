@@ -1,4 +1,4 @@
-import { MEXICO_PLAYER_DATA, CZECH_PLAYER_DATA, type PlayerData } from './players';
+import { MEXICO_PLAYER_DATA, CZECH_PLAYER_DATA, SOUTH_AFRICA_PLAYER_DATA, type PlayerData } from './players';
 
 export interface AwayTeamInfo {
   rank: string;
@@ -124,6 +124,46 @@ export const MATCHES: Record<string, MatchConfig> = {
       NONE: '없음 (무득점)',
     },
   },
+  '3': {
+    id: '3',
+    label: '3차전',
+    awayTeamName: '남아공',
+    awayTeamFlag: '🇿🇦',
+    date: '2026년 6월 25일 10:00 (KST)',
+    localDate: '현지: 6월 24일 19:00 (CST)',
+    venue: '에스타디오 BBVA, 과달루페',
+    awayPlayerData: SOUTH_AFRICA_PLAYER_DATA,
+    awayTeamInfo: {
+      rank: 'FIFA 56위',
+      coach: 'H. 브루스',
+      keyPlayers: ['P. 타우', 'L. 포스터 (번리)', 'T. 즈와네'],
+      borderClass: 'border-t-yellow-500',
+      accentClass: 'text-yellow-700',
+      bgClass: 'bg-yellow-50',
+    },
+    headToHead: {
+      total: 1,
+      koreaWin: 0,
+      draw: 0,
+      awayWin: 1,
+      lastMeeting: '2000년 · 0-1 패',
+    },
+    matchResultLabels: {
+      KOREA_WIN: '🇰🇷 대한민국 승',
+      DRAW: '🤝 무승부',
+      MEXICO_WIN: '🇿🇦 남아공 승',
+    },
+    halfTimeResultLabels: {
+      KOREA_LEAD: '🇰🇷 대한민국 리드',
+      DRAW: '🤝 무승부',
+      MEXICO_LEAD: '🇿🇦 남아공 리드',
+    },
+    firstGoalTeamLabels: {
+      KOREA: '🇰🇷 대한민국',
+      MEXICO: '🇿🇦 남아공',
+      NONE: '없음 (무득점)',
+    },
+  },
 };
 
-export const DEFAULT_MATCH_ID = '2';
+export const DEFAULT_MATCH_ID = '3';

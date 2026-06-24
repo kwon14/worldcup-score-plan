@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { MATCHES } from '@/constants/matches';
 import { getEspnLiveMatchData } from '@/lib/api/espn';
 import { getAdminAuth } from '@/lib/firebase/admin';
 import type { LiveMatchResponse } from '@/types/match';
@@ -33,12 +34,13 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Failed to fetch live match data', error);
 
+    const configuredMatch = MATCHES[matchId];
     const response: LiveMatchResponse = {
       available: false,
       fixtureId: null,
       status: null,
-      homeTeam: matchId === '1' ? '대한민국' : '멕시코',
-      awayTeam: matchId === '1' ? '체코' : '대한민국',
+      homeTeam: matchId === '3' ? configuredMatch?.awayTeamName ?? '남아공' : '대한민국',
+      awayTeam: matchId === '3' ? '대한민국' : configuredMatch?.awayTeamName ?? '멕시코',
       homeScore: null,
       awayScore: null,
       homeHalfScore: null,
