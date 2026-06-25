@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildLineupPlayerOptions, buildPredictionPlayerData } from '../lib/lineups/playerOptions';
+import { buildLineupPlayerOptions, buildPredictionPlayerData, translateLineupName } from '../lib/lineups/playerOptions';
 import type { PlayerData } from '../constants/players';
 import type { TeamLineup } from '../types/match';
 
@@ -35,8 +35,8 @@ const options = buildLineupPlayerOptions({
   fallbackAwayPlayers: ['P. 타우', '직접 입력'],
 });
 
-assert.deepEqual(options.koreaPlayers, ['Son Heung-Min', 'Lee Kang-In', 'Cho Gue-Sung', '직접 입력']);
-assert.deepEqual(options.awayPlayers, ['Ronwen Williams', 'Lyle Foster', 'Themba Zwane', '직접 입력']);
+assert.deepEqual(options.koreaPlayers, ['손흥민', '이강인', '조규성', '직접 입력']);
+assert.deepEqual(options.awayPlayers, ['론웬 윌리엄스', '라일 포스터', '템바 즈와네', '직접 입력']);
 
 const fallback = buildLineupPlayerOptions({
   lineups: [],
@@ -54,11 +54,13 @@ const predictionPlayers = buildPredictionPlayerData(['Son Heung-Min', '손흥민
 assert.deepEqual(
   predictionPlayers.map((player) => [player.name, player.position, player.club]),
   [
-    ['Son Heung-Min', '-', '라인업'],
     ['손흥민', 'FW', 'LA FC'],
-    ['Lee Kang-In', '-', '라인업'],
+    ['이강인', '-', '라인업'],
     ['없음', '-', '-'],
   ],
 );
+assert.equal(translateLineupName('Kim Min-Jae'), '김민재');
+assert.equal(translateLineupName('Evidence Makgopa'), '에비던스 마크고파');
+assert.equal(translateLineupName('Unknown Player'), 'Unknown Player');
 
 console.log('lineup player options tests passed');

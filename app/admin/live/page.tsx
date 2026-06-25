@@ -29,8 +29,6 @@ const STATUS_FLOW: { status: MatchStatusShort; label: string; color: string }[] 
   { status: 'FT',  label: '경기 종료', color: 'bg-red-600' },
 ];
 
-const KOREA_PLAYERS = [...KOREA_PLAYER_DATA.filter((p) => p.name !== '없음').map((p) => p.name), '직접 입력'];
-
 function isKoreaTeam(teamName: string) {
   const lower = teamName.toLowerCase();
   return lower.includes('korea') || teamName.includes('대한민국');
@@ -257,10 +255,11 @@ export default function AdminLivePage() {
   const [officialLoading, setOfficialLoading] = useState(false);
   const [officialError, setOfficialError] = useState<string | null>(null);
 
+  const fallbackKoreaPlayers = [...(match.koreaPlayerData ?? KOREA_PLAYER_DATA).filter((p) => p.name !== '없음').map((p) => p.name), '직접 입력'];
   const fallbackAwayPlayers = [...match.awayPlayerData.filter((p) => p.name !== '없음').map((p) => p.name), '직접 입력'];
   const { koreaPlayers, awayPlayers } = buildLineupPlayerOptions({
     lineups: officialMode === 'lineups' ? officialData?.lineups ?? [] : [],
-    fallbackKoreaPlayers: KOREA_PLAYERS,
+    fallbackKoreaPlayers,
     fallbackAwayPlayers,
   });
 
@@ -357,7 +356,7 @@ export default function AdminLivePage() {
       if (mode === 'lineups') {
         const lineupOptions = buildLineupPlayerOptions({
           lineups: data.lineups,
-          fallbackKoreaPlayers: KOREA_PLAYERS,
+          fallbackKoreaPlayers,
           fallbackAwayPlayers,
         });
         await updateMatchState(matchId, {

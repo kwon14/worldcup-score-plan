@@ -168,7 +168,8 @@ export default function PredictPage() {
   ];
 
   const totalGoals = koreaScore !== '' && mexicoScore !== '' ? Number(koreaScore) + Number(mexicoScore) : null;
-  const koreaScorerPlayers = buildPredictionPlayerData(matchState?.koreaLineupPlayers, KOREA_PLAYER_DATA);
+  const matchKoreaPlayerData = match.koreaPlayerData ?? KOREA_PLAYER_DATA;
+  const koreaScorerPlayers = buildPredictionPlayerData(matchState?.koreaLineupPlayers, matchKoreaPlayerData);
   const awayScorerPlayers = buildPredictionPlayerData(matchState?.awayLineupPlayers, match.awayPlayerData);
 
   const isValid = authStatus === 'signed-in' && !!claims?.name && matchResult && koreaScore !== '' && mexicoScore !== '' &&

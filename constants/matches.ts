@@ -1,4 +1,4 @@
-import { MEXICO_PLAYER_DATA, CZECH_PLAYER_DATA, SOUTH_AFRICA_PLAYER_DATA, type PlayerData } from './players';
+import { MEXICO_PLAYER_DATA, CZECH_PLAYER_DATA, SOUTH_AFRICA_PLAYER_DATA, KOREA_SOUTH_AFRICA_LINEUP_PLAYER_DATA, type PlayerData } from './players';
 
 export interface AwayTeamInfo {
   rank: string;
@@ -30,6 +30,7 @@ export interface MatchConfig {
   date: string;
   localDate: string;
   venue: string;
+  koreaPlayerData?: PlayerData[];
   awayPlayerData: PlayerData[];
   awayTeamInfo: AwayTeamInfo;
   headToHead: HeadToHead;
@@ -132,6 +133,7 @@ export const MATCHES: Record<string, MatchConfig> = {
     date: '2026년 6월 25일 10:00 (KST)',
     localDate: '현지: 6월 24일 19:00 (CST)',
     venue: '에스타디오 BBVA, 과달루페',
+    koreaPlayerData: KOREA_SOUTH_AFRICA_LINEUP_PLAYER_DATA,
     awayPlayerData: SOUTH_AFRICA_PLAYER_DATA,
     awayTeamInfo: {
       rank: 'FIFA 60위',
