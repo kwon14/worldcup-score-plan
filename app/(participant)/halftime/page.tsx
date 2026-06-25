@@ -15,6 +15,7 @@ import { subscribeMatchState, type MatchStateDoc } from '@/lib/firebase/matchSta
 import { subscribePredictions, getPrediction, savePrediction, type PredictionDoc } from '@/lib/firebase/predictions';
 import { getParticipantId } from '@/lib/firebase/auth';
 import { useMatch } from '@/contexts/MatchContext';
+import { buildPredictionPlayerData, samePlayerName } from '@/lib/lineups/playerOptions';
 
 // ─── 상수 ─────────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ function computeIntermediateScore(pred: PredictionDoc, ms: MatchStateDoc): numbe
         else if (Math.abs(predOrder - actOrder) === 1) score += 5;
       }
     }
-    if (ms.koreaFirstScorer && ms.koreaFirstScorer !== '없음' && pred.koreaFirstScorer === ms.koreaFirstScorer) {
+    if (ms.koreaFirstScorer && ms.koreaFirstScorer !== '없음' && samePlayerName(pred.koreaFirstScorer, ms.koreaFirstScorer)) {
       score += SCORE_WEIGHTS.koreaFirstScorer;
     }
   }
@@ -248,6 +249,9 @@ export default function HalfTimePage() {
 
   const totalGoals =
     koreaScore !== '' && mexicoScore !== '' ? Number(koreaScore) + Number(mexicoScore) : null;
+  const matchKoreaPlayerData = match.koreaPlayerData ?? KOREA_PLAYER_DATA;
+  const koreaScorerPlayers = buildPredictionPlayerData(matchState?.koreaLineupPlayers, matchKoreaPlayerData);
+  const awayScorerPlayers = buildPredictionPlayerData(matchState?.awayLineupPlayers, match.awayPlayerData);
 
   async function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -495,7 +499,7 @@ export default function HalfTimePage() {
             ? <LockedOverlay reason={`전반 첫 득점자 확정: ${matchState?.koreaFirstScorer}`} />
             : <PlayerSelector
                 name="koreaFirstScorer"
-                players={KOREA_PLAYER_DATA}
+                players={koreaScorerPlayers}
                 value={koreaFirstScorer}
                 onChange={setKoreaFirstScorer}
                 accentColor="korea-red"
@@ -521,7 +525,7 @@ export default function HalfTimePage() {
             ? <LockedOverlay reason={`전반 첫 득점자 확정: ${matchState?.mexicoFirstScorer}`} />
             : <PlayerSelector
                 name="mexicoFirstScorer"
-                players={match.awayPlayerData}
+                players={awayScorerPlayers}
                 value={mexicoFirstScorer}
                 onChange={setMexicoFirstScorer}
                 accentColor="green-600"
