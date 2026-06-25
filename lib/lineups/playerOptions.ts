@@ -57,8 +57,27 @@ const ESPN_NAME_KO: Record<string, string> = {
   'Yang Hyun-Jun': '양현준',
 };
 
+const PLAYER_NAME_ALIASES: Record<string, string> = {
+  ...ESPN_NAME_KO,
+  'L. 포스터': '라일 포스터',
+  'T. 즈와네': '템바 즈와네',
+  'E. 마크고파': '에비던스 마크고파',
+  'O. 아폴리스': '오스윈 아폴리스',
+  'R. 윌리엄스': '론웬 윌리엄스',
+  'T. 모코에나': '테보호 모코에나',
+};
+
 export function translateLineupName(name: string) {
   return ESPN_NAME_KO[name] ?? name;
+}
+
+export function canonicalPlayerName(name: string | null | undefined) {
+  if (!name) return '';
+  return PLAYER_NAME_ALIASES[name] ?? name;
+}
+
+export function samePlayerName(a: string | null | undefined, b: string | null | undefined) {
+  return canonicalPlayerName(a) === canonicalPlayerName(b);
 }
 
 function isKoreaTeam(teamName: string) {
