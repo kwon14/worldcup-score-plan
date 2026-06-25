@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronRight, Users, ClipboardList, Trophy, AlertTriangle, DatabaseZap, Trash2 } from 'lucide-react';
 import type { GameStatus } from '@/types/game';
 import { GAME_STATUS_LABELS } from '@/lib/game/gameState';
+import { toMatchStatus } from '@/lib/game/statusMapping';
 import { subscribeGameStatus, setGameStatus } from '@/lib/firebase/gameStatus';
 import { subscribeActualResult, type ActualResultDoc } from '@/lib/firebase/results';
 import { updateMatchState } from '@/lib/firebase/matchState';
@@ -83,14 +84,6 @@ export default function AdminDashboard() {
     try { await resetAllData(matchId); } finally { setResetting(false); setConfirmReset(false); }
   }
 
-  // gameStatus 전환 시 matchState.status도 함께 동기화
-  const GAME_TO_MATCH_STATUS: Partial<Record<GameStatus, string>> = {
-    FIRST_HALF:  '1H',
-    HALF_TIME:   'HT',
-    SECOND_HALF: '2H',
-    AFTER_MATCH: 'FT',
-  };
-
   async function handleStatusChange() {
     if (!nextTransition || cannotOpenResult) return;
     if (nextTransition.danger && confirmNext !== nextTransition.to) {
@@ -98,8 +91,8 @@ export default function AdminDashboard() {
       return;
     }
     await setGameStatus(matchId, nextTransition.to);
-    const matchStatus = GAME_TO_MATCH_STATUS[nextTransition.to];
-    if (matchStatus) await updateMatchState(matchId, { status: matchStatus as never });
+    const matchStatus = toMatchStatus(nextTransition.to);
+    if (matchStatus) await updateMatchState(matchId, { status: matchStatus });
     setConfirmNext(null);
   }
 

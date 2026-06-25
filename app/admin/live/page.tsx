@@ -15,6 +15,8 @@ import {
 } from '@/lib/firebase/matchState';
 import type { MatchStateDoc, MatchEventDoc } from '@/lib/firebase/matchState';
 import { app } from '@/lib/firebase/config';
+import { setGameStatus } from '@/lib/firebase/gameStatus';
+import { toGameStatus } from '@/lib/game/statusMapping';
 import { useMatch } from '@/contexts/MatchContext';
 import { KOREA_PLAYER_DATA } from '@/constants/players';
 import { buildLineupPlayerOptions } from '@/lib/lineups/playerOptions';
@@ -284,13 +286,20 @@ export default function AdminLivePage() {
   async function handleStatusSave() {
     if (!matchState || !selectedStatus || selectedStatus === matchState.status) return;
     setStatusLoading(true);
-    const payload: Partial<Omit<MatchStateDoc, 'updatedAt'>> = { status: selectedStatus! };
-    if (selectedStatus === 'HT') {
-      payload.koreaHalfScore = matchState.koreaScore;
-      payload.mexicoHalfScore = matchState.mexicoScore;
+    try {
+      const payload: Partial<Omit<MatchStateDoc, 'updatedAt'>> = { status: selectedStatus };
+      if (selectedStatus === 'HT') {
+        payload.koreaHalfScore = matchState.koreaScore;
+        payload.mexicoHalfScore = matchState.mexicoScore;
+      }
+      const gameStatus = toGameStatus(selectedStatus);
+      await Promise.all([
+        updateMatchState(matchId, payload),
+        gameStatus ? setGameStatus(matchId, gameStatus) : Promise.resolve(),
+      ]);
+    } finally {
+      setStatusLoading(false);
     }
-    await updateMatchState(matchId, payload);
-    setStatusLoading(false);
   }
 
   async function handleScoreUpdate() {
@@ -331,6 +340,7 @@ export default function AdminLivePage() {
       setOfficialMode('summary');
       await Promise.all(events.map((event) => deleteMatchEvent(matchId, event.id)));
       await updateMatchState(matchId, { ...toKoreaScorePayload(data), status: 'FT' });
+      await setGameStatus(matchId, 'AFTER_MATCH');
       await Promise.all(officialGoals(data).map((goal) => addGoalEvent(matchId, goal)));
       await Promise.all(officialCards(data).map((card) => addCardEvent(matchId, card)));
     } catch (err) {
@@ -340,6 +350,7 @@ export default function AdminLivePage() {
         koreaScore: Number(scoreInput.korea),
         mexicoScore: Number(scoreInput.mexico),
       });
+      await setGameStatus(matchId, 'AFTER_MATCH');
     } finally {
       setOfficialLoading(false);
       setStatusLoading(false);
